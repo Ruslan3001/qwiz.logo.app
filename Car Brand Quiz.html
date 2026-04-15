@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Car Quiz App</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Car Quiz">
+    <link rel="apple-touch-icon" href="icon.png">
+    <style>
+        :root {
+            --font-size: 40px; /* Базовый размер шрифта по умолчанию */
+            --bg-color: #f4f4f9;
+            --text-color: #333;
+            --btn-border: 3px solid #333;
+            --correct-color: #4CAF50;
+            --incorrect-color: #F44336;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Шапка с гамбургером и статистикой */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .hamburger {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 30px;
+            height: 20px;
+        }
+
+        .hamburger div {
+            height: 3px;
+            background-color: var(--text-color);
+            border-radius: 2px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        /* Главное меню */
+        #menu-overlay {
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 100;
+            transition: left 0.3s ease;
+        }
+
+        #menu-overlay.active {
+            left: 0;
+        }
+
+        .menu-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 80%;
+            max-width: 300px;
+            height: 100%;
+            background-color: #fff;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
+
+        .close-btn {
+            align-self: flex-end;
+            font-size: 24px;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+
+        .menu-content button, .menu-content label {
+            font-size: 1.2rem;
+            padding: 10px;
+            border: var(--btn-border);
+            border-radius: 8px;
+            background-color: white;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .menu-content input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 1.2rem;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            margin-top: 5px;
+        }
+
+        /* Контейнеры экранов */
+        .screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* Кнопки главного экрана */
+        .mode-btn {
+            font-size: 1.5rem;
+            padding: 15px 30px;
+            margin: 10px;
+            width: 100%;
+            max-width: 400px;
+            border: var(--btn-border);
+            border-radius: 12px;
+            background-color: white;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        .mode-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Экран викторины */
+        .image-container {
+            width: 100%;
+            max-width: 300px;
+            aspect-ratio: 16/9;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .loader {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #666;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        @media (min-width: 600px) {
+            .options-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .option-btn {
+            /* Применяем настраиваемый размер шрифта */
+            font-size: var(--font-size); 
+            padding: 15px 20px;
+            border: var(--btn-border);
+            border-radius: 12px;
+            background-color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            word-wrap: break-word;
+        }
+
+        /* Состояния ответов */
+        .option-btn.correct {
+            background-color: var(--correct-color);
+            color: white;
+            border-color: var(--correct-color);
+        }
+
+        .option-btn.incorrect {
+            background-color: var(--incorrect-color);
+            color: white;
+            border-color: var(--incorrect-color);
+        }
+
+        .option-btn.correct-outline {
+            border: 4px solid var(--correct-color);
+        }
+
+        /* Анимация серпантина (Confetti) */
+        #confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            overflow: hidden;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            top: -20px;
+            width: 10px;
+            height: 30px;
+            opacity: 0.8;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(110vh) rotate(720deg); }
+        }
+        
+        .title {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Шапка -->
+    <header>
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="stats">
+            <div>Вопросов: <span id="total-asked">0</span></div>
+            <div>Верно: <span id="correct-answers">0</span></div>
+            <div>Время: <span id="timer">00:00</span></div>
+        </div>
+    </header>
+
+    <!-- Боковое меню -->
+    <div id="menu-overlay" onclick="handleMenuOverlayClick(event)">
+        <div class="menu-content">
+            <button class="close-btn" onclick="toggleMenu()">×</button>
+            <button onclick="resetApp()">Сбросить прогресс</button>
+            <button id="pause-btn" onclick="togglePause()">Пауза</button>
+            <div>
+                <label for="font-size-input">Размер шрифта (px):</label>
+                <input type="number" id="font-size-input" value="40" min="10" max="100" onchange="updateFontSize(this.value)">
+            </div>
+            <button onclick="goToStart()">На главную</button>
+        </div>
+    </div>
+
+    <!-- Стартовый экран -->
+    <main id="start-screen" class="screen active">
+        <h1 class="title">Car Quiz</h1>
+        <button class="mode-btn" onclick="startQuiz('emblems')">По эмблеме</button>
+        <button class="mode-btn" onclick="startQuiz('internet')">По фото из сети</button>
+    </main>
+
+    <!-- Экран викторины -->
+    <main id="quiz-screen" class="screen">
+        <div class="image-container" id="question-image">
+            <!-- Сюда вставляется SVG -->
+        </div>
+        <div class="options-grid" id="options-container">
+            <!-- Кнопки вариантов ответов генерируются JS -->
+        </div>
+    </main>
+
+    <!-- Контейнер для анимации конфетти -->
+    <div id="confetti-container"></div>
+
+    <script>
+        /**
+         * ==============================================================
+         * БЛОК ДАННЫХ (BASE64 ИЗОБРАЖЕНИЯ)
+         * Формат: { answer: 'Brand', url: 'data:image/jpeg;base64,...' }
+         * ==============================================================
+         */
+        const CAR_DATA = {
+            emblems: [
+                { answer: "9FF", url: "Logo%20png/689115a6c47e8b9339ee412dc3300c3c_MD5.png" },
+                { answer: "AAA (Ateliers d’Automobiles et d’Aviation)", url: "Logo%20png/a8ac28dab91b74675622b0f4bafe63af_MD5.png" },
+                { answer: "Aaglander", url: "Logo%20png/330591714e00e13e0d68188eb8804201_MD5.png" },
+                { answer: "Abadal", url: "Logo%20png/0cdd9bb9bda7b19cc6ada6d0908795e5_MD5.png" },
+                { answer: "Abarth", url: "Logo%20png/b245109130832b93de0c007adfb9e7b8_MD5.jpg" },
+                { answer: "ABC", url: "Logo%20png/e1ff3834dea3d551a75535250854b72d_MD5.png" },
+                { answer: "AC", url: "Logo%20png/b32e382016a985b0b8e693cc2f7cc623_MD5.png" },
+                { answer: "AC sport", url: "Logo%20png/62677132efb0f0ebd5f2580ed56d2a69_MD5.png" },
+                { answer: "Acadian", url: "Logo%20png/e981870a43bb3f2482767b40b0ca62ea_MD5.png" },
+                { answer: "Acura", url: "Logo%20png/9eac20f6d88b69944a0f897d16a14ca0_MD5.jpg" },
+                { answer: "Adam", url: "Logo%20png/bbdeef596b09a3532fbd3294617c097c_MD5.png" },
+                { answer: "Adamastor", url: "Logo%20png/8ae2b29e37add901b1cd39dbcce64feb_MD5.png" },
+                { answer: "AEHRA", url: "Logo%20png/0689dc126b25bbf2098d7b31c261115e_MD5.png" },
+                { answer: "Aero", url: "Logo%20png/bc4480eff85841099eb334df2276514b_MD5.png" },
+                { answer: "AFA", url: "Logo%20png/dd9f01dd85a94f089922a08cfa569033_MD5.png" },
+                { answer: "Afeela", url: "Logo%20png/b768b4b6a93466068dd7ab3bd7146c0b_MD5.png" },
+                { answer: "Aito", url: "Logo%20png/b8461ca5fe7d774d68f8c6f878f039ce_MD5.jpg" },
+                { answer: "Aiways", url: "Logo%20png/080dfd748dd50e63d05c3e35a5709cbb_MD5.png" },
+                { answer: "Aixam", url: "Logo%20png/855791c877c5725826c128e458aa53c2_MD5.jpg" },
+                { answer: "Aixam Mega", url: "Logo%20png/6af9fbdb03ae77b7e603d4e39549f6e9_MD5.png" },
+                { answer: "AKT", url: "Logo%20png/d788e899b47b68060b5a34faa817a599_MD5.png" },
+                { answer: "Alba Regia", url: "Logo%20png/ae84455282f91bab47e166d5cfdb2ac7_MD5.png" },
+                { answer: "Albany", url: "Logo%20png/c3fbd80caf01528e69c71b7f479246e2_MD5.png" },
+                { answer: "Alcobia e Ribeiro", url: "Logo%20png/5b24c1779145779f2620bfb78f9edff1_MD5.png" },
+                { answer: "Alfa Romeo", url: "Logo%20png/b225f968be54b1c5f4787d7057892ccc_MD5.jpg" },
+                { answer: "Alpina", url: "Logo%20png/3b63f7c39c806c1bc122cedf4b512bc3_MD5.jpg" },
+                { answer: "Alpine", url: "Logo%20png/af79aa7d6cefcfee334f19956926dcc9_MD5.png" },
+                { answer: "Alta", url: "Logo%20png/d950f05dea1ccb4240b46a26074f8142_MD5.png" },
+                { answer: "Alvis", url: "Logo%20png/7b1b400192a4a88940561d3dcf421a45_MD5.png" },
+                { answer: "AMC", url: "Logo%20png/3483440c9aab442faaf1f43fc3a4b27a_MD5.jpg" },
+                { answer: "AMG", url: "Logo%20png/d36c47e8ead5019fc443d513b3624e4c_MD5.jpg" },
+                { answer: "Amilcar Italiana", url: "Logo%20png/0d0dc33be73a8274b76a5d58575a89a2_MD5.png" },
+                { answer: "Ampere", url: "Logo%20png/b86f09f2cdfa57863f3ea0d123a22b62_MD5.png" },
+                { answer: "Anfin", url: "Logo%20png/fcab41033519a97f17a480b06f34738b_MD5.jpg" },
+                { answer: "Anker", url: "Logo%20png/1b7b0a931affef978f4ec05465051c37_MD5.jpg" },
+                { answer: "Apal", url: "Logo%20png/5e62bf9ebd82f86f517d6e08c65e36cb_MD5.jpg" },
+                { answer: "Apollo", url: "Logo%20png/33caf5af3b68b22610bc62e61dfe2bfe_MD5.jpg" },
+                { answer: "Appollen", url: "Logo%20png/192609b16b07804901c4e8639633befa_MD5.jpg" },
+                { answer: "Aprilia", url: "Logo%20png/1cf6fb60b469e27c6a33bc649537c6f3_MD5.jpg" },
+                { answer: "Aptera", url: "Logo%20png/ad2fedc6ac752b446ebdb1306da86e92_MD5.png" },
+                { answer: "Aquila Italiana", url: "Logo%20png/6c865297a2fe7e9b15c4992a36e2237e_MD5.png" },
+                { answer: "Arash", url: "Logo%20png/36aca814d80eb4fafbcfb916f6cc2783_MD5.png" },
+                { answer: "Arcfox", url: "Logo%20png/542b284de059ae080893bd3d8661b9c3_MD5.jpg" },
+                { answer: "Arctic Cat", url: "Logo%20png/36d2719ae27d5aaa2cba7a9d371ce2e8_MD5.jpg" },
+                { answer: "Aria", url: "Logo%20png/74be9b4f1fbe87bf6f159335d5579921_MD5.jpg" },
+                { answer: "Ariel", url: "Logo%20png/7614ae61614c183af590dae7076fa43c_MD5.jpg" },
+                { answer: "Arlen Ness", url: "Logo%20png/84f1d475650038da4881e6e5807783aa_MD5.jpg" },
+                { answer: "Armstrong Siddeley", url: "Logo%20png/d9a9093bffc6ead912c5b24a0416ac6e_MD5.png" },
+                { answer: "ARO", url: "Logo%20png/afe7ba2e9a439d7ad8c75c59996dd37c_MD5.jpg" },
+                { answer: "Arrinera", url: "Logo%20png/b6c394ec447d26cf9366213cbbe5dfb2_MD5.png" },
+                { answer: "Artega", url: "Logo%20png/dfdfab9049ab2c25e774e00734080b3d_MD5.png" },
+                { answer: "ASA", url: "Logo%20png/e5d54b653d95f7dd9ab66259a6bb0c0a_MD5.png" },
+                { answer: "Ascari", url: "Logo%20png/72355bf3d04d2ff78fd868760e19030e_MD5.png" },
+                { answer: "Ashok Leyland", url: "Logo%20png/e85f69a4c1ac360e446e9a33497255f3_MD5.jpg" },
+                { answer: "Asia", url: "Logo%20png/54bf4f702231a23bee6f096c34510e41_MD5.png" },
+                { answer: "Aspark", url: "Logo%20png/cd87a7881e2b5e6ba1af14857fcf71f7_MD5.png" },
+                { answer: "Asquith", url: "Logo%20png/5c10ddd1d1fa9684660e42ac3ef4cddd_MD5.jpg" },
+                { answer: "Astério", url: "Logo%20png/b328ea5aee52347498cd3827515e946c_MD5.png" },
+                { answer: "Aston Martin", url: "Logo%20png/84978cfa97430044afa958381db6435b_MD5.png" },
+                { answer: "Asüna", url: "Logo%20png/88f855017302cc835b9b3f0600cd0d08_MD5.png" },
+                { answer: "Atalanta", url: "Logo%20png/e74fc1a2655e7ac34a0d86ca93024895_MD5.jpg" },
+                { answer: "ATK", url: "Logo%20png/ae1354eec7ae411688ecf318f9e1e5cc_MD5.jpg" },
+                { answer: "Auburn", url: "Logo%20png/6e0e91a74422d6bb529373e39233e96a_MD5.jpg" },
+                { answer: "Audi", url: "Logo%20png/3374e323e9fc21a264fce80215e080ae_MD5.jpg" },
+                { answer: "Audi Sport", url: "Logo%20png/c542f12ed8c6f15c784fe267b8f01e51_MD5.jpg" },
+                { answer: "Aurea", url: "Logo%20png/b2c64cb807bab0434b3579dabf82c0d3_MD5.png" },
+                { answer: "Aurus", url: "Logo%20png/bcac44e16b737be75d1ef75de58279b8_MD5.jpg" },
+                { answer: "Austin", url: "Logo%20png/290e8fdc7366d7306b28399e8f40f2ce_MD5.png" },
+                { answer: "Austin-Healey", url: "Logo%20png/33ef92c8890280b792bfa056260aab7e_MD5.jpg" },
+                { answer: "Austro-Daimler", url: "Logo%20png/49462229d80ae064acc6785d1968947a_MD5.png" },
+                { answer: "Autobianchi", url: "Logo%20png/93ac2519bfd7c033786f9d2795c0870e_MD5.png" },
+                { answer: "Automobiles Alba", url: "Logo%20png/b08b5514f3651cada7c708d2912f14f8_MD5.png" },
+                { answer: "Automobili Turismo e Sport", url: "Logo%20png/da1a1ba9a7e4c341377b86540d2fce93_MD5.png" },
+                { answer: "Auverland", url: "Logo%20png/158d39343d3fa7805a097a301023ccfa_MD5.png" },
+                { answer: "Avatr", url: "Logo%20png/423c463e4be8057d7fdf955c4ca0ac2d_MD5.png" },
+                { answer: "AWZ", url: "Logo%20png/fbd54968cb7af84a116faec2e5a41d76_MD5.jpg" },
+                { answer: "BAC", url: "Logo%20png/670be45787c6d3d44764509c73ca772d_MD5.jpg" },
+                { answer: "BAIC Group", url: "Logo%20png/8350478ddfc5e03252cb2e09d31fc166_MD5.png" },
+                { answer: "Bajaj", url: "Logo%20png/af35a113f94680608021544faab9cfad_MD5.jpg" },
+                { answer: "Baltasar", url: "Logo%20png/3e84be4d6be40b7df5bcbec914e88d17_MD5.jpg" },
+                { answer: "Baltijas Dzips", url: "Logo%20png/4836fa55263e326b8a7ced88fc88b2d5_MD5.jpg" },
+                { answer: "Bandini Automobili", url: "Logo%20png/6d5dadb75a5f0fefa9a191ae3b9b8580_MD5.png" },
+                { answer: "Baojun", url: "Logo%20png/3723a17f535a9a18a22fef9016640eda_MD5.png" },
+                { answer: "Barkas", url: "Logo%20png/b0125645be16744dc43776eef5441a1b_MD5.jpg" },
+                { answer: "Barreiros", url: "Logo%20png/95e2e7424370a5e0763542c3402dc9c2_MD5.png" },
+                { answer: "Beaumont", url: "Logo%20png/809fa53bff4e673817722da4bf8d34bb_MD5.png" },
+                { answer: "Bedford", url: "Logo%20png/9feb5b97f98cc09e606f63e817534b44_MD5.png" },
+                { answer: "Beijing Automobile Works", url: "Logo%20png/d7386c409c3266e530ebc721b27866d6_MD5.png" },
+                { answer: "Bellier Automobiles", url: "Logo%20png/f33f2892e56a83314a06f6a160c3093c_MD5.png" },
+                { answer: "Benelli", url: "Logo%20png/182f9fd80c4e3d1ef2e558c5ec7ce0e0_MD5.jpg" },
+                { answer: "Bentley", url: "Logo%20png/20997486a73f1dfb3423ce952dbc7aad_MD5.png" },
+                { answer: "Berkeley", url: "Logo%20png/4cc49eb830ce5b5db9a3ca27c6d7162c_MD5.png" },
+                { answer: "Berliet", url: "Logo%20png/e68ad041642788fdc16c4cde3503e1d2_MD5.png" },
+                { answer: "Bertone", url: "Logo%20png/3770bd9466e46a90b7ec8594e75fa915_MD5.jpg" },
+                { answer: "Bestune", url: "Logo%20png/2ea881b159e9a0f8e33a421a20467960_MD5.png" },
+                { answer: "BharatBenz", url: "Logo%20png/20e84d63e95681aa9be649bb852db39f_MD5.png" },
+                { answer: "Biscuter", url: "Logo%20png/1525a9a4ecaa97a0bf23d6fc1f235f76_MD5.png" },
+                { answer: "Bisu", url: "Logo%20png/23ed5f141295c07d027d784540c62a90_MD5.jpg" },
+                { answer: "Bitter", url: "Logo%20png/759e963d76295e9fc865a59bfb01ae71_MD5.jpg" },
+                { answer: "Bizzarrini", url: "Logo%20png/cef103d6cd2ea04453e93f5c1297fd34_MD5.png" },
+                { answer: "BMW i", url: "Logo%20png/d685224550f66ae32c08a2987402b3be_MD5.png" },
+                { answer: "BMW", url: "Logo%20png/89856d6d2208c3891b8a3bcb20d0f0ae_MD5.jpg" },
+                { answer: "BMW M", url: "Logo%20png/abaeccb8438ae3e5f617eed17243c30c_MD5.png" },
+                { answer: "Bobcat Company", url: "Logo%20png/59f543cc82f9629bf8f9946bc874f0ad_MD5.png" },
+                { answer: "Bogdan", url: "Logo%20png/2ec859e2d5ad21702c635155289dfcd0_MD5.jpg" },
+                { answer: "Bollinger", url: "Logo%20png/f7302308cad717dee0923b4adf73e2ee_MD5.jpg" },
+                { answer: "Bordrin", url: "Logo%20png/01d79a89a942e1c7b211acffb9d801c5_MD5.jpg" },
+                { answer: "Borgward", url: "Logo%20png/8af260583373ec717ea7cc3e3a93908c_MD5.jpg" },
+                { answer: "Bowler", url: "Logo%20png/5c62e3a1ac9f3b738f3b96dbd3f2505e_MD5.jpg" },
+                { answer: "Brabham", url: "Logo%20png/d89182727fe508d527d1f67f6355be94_MD5.jpg" },
+                { answer: "Brabus", url: "Logo%20png/ec62aa34f2711c8b16ab2265cb815806_MD5.jpg" },
+                { answer: "Brammo", url: "Logo%20png/aee4fe1a0bbcf5d414e7164ef380b374_MD5.jpg" },
+                { answer: "Bremach", url: "Logo%20png/68ca99e7db2b7e540f96509d395eb6d8_MD5.jpg" },
+                { answer: "Brennabor-Werke", url: "Logo%20png/0a8a4d5861673c0283b0a57e5c94fcea_MD5.png" },
+                { answer: "Brilliance", url: "Logo%20png/6d523c32b55aa5d0d58dc81bc8381423_MD5.jpg" },
+                { answer: "Bristol", url: "Logo%20png/ab2eb3d2cfeaef54b43ce245a5c0e1a3_MD5.jpg" },
+                { answer: "Brockway", url: "Logo%20png/108d840a5f16e3f95533482882d2a65c_MD5.png" },
+                { answer: "Brooke Cars", url: "Logo%20png/59209850948089e15b90ffd614d2df05_MD5.jpg" },
+                { answer: "BSA", url: "Logo%20png/501a75ee5e3123c37c190a9d3ec2421b_MD5.jpg" },
+                { answer: "Bugatti", url: "Logo%20png/205108b826c3f28d23e0f7fa954417bb_MD5.png" },
+                { answer: "Buick", url: "Logo%20png/e0b2371f26223bed9ce1d7b461580e58_MD5.png" },
+                { answer: "Büssing", url: "Logo%20png/05121ee6ea248b0634ff0d2a22127e62_MD5.jpg" },
+                { answer: "BYD", url: "Logo%20png/bd05a8154a6b571dfac7a262b8748c73_MD5.png" },
+                { answer: "Cadillac", url: "Logo%20png/36535837498a3e6cf891ee6061bc1a4e_MD5.png" },
+                { answer: "Cagiva", url: "Logo%20png/f2e4a98ebf4677ec6e92640e3e46c0dd_MD5.jpg" },
+                { answer: "Callaway", url: "Logo%20png/3fbc3ca09ab6334eb0a296c1ac939177_MD5.jpg" },
+                { answer: "Campagna", url: "Logo%20png/293297d9f0eff1a1d08a8284f53b6827_MD5.jpg" },
+                { answer: "Can-Am", url: "Logo%20png/d5954c406fdea276f0c935befb5bfcd8_MD5.png" },
+                { answer: "Caresto", url: "Logo%20png/f3d782057e0e6c2573c72e804bbe33d3_MD5.png" },
+                { answer: "Carlsson", url: "Logo%20png/3a63e8ea718732227a0822d862748c06_MD5.png" },
+                { answer: "Cartercar", url: "Logo%20png/45e77c43791303fc61fb7c0884e8f623_MD5.png" },
+                { answer: "Casalini", url: "Logo%20png/9bcc97a018bcf29c214f34aa49cd514f_MD5.png" },
+                { answer: "Caterham", url: "Logo%20png/2ed41a84a4aab3076179c893dc32f45c_MD5.jpg" },
+                { answer: "Ceirano", url: "Logo%20png/f0c5f350a1d13754140acb0ed3146117_MD5.png" },
+                { answer: "Cenntro", url: "Logo%20png/87f12684ccbe4bb2dfed18dc09e9588e_MD5.jpg" },
+                { answer: "Century", url: "Logo%20png/c31f3b75836494438563bebdfbed4b74_MD5.png" },
+                { answer: "Changan", url: "Logo%20png/7a8e5a189efb4f61b82c3e5f0b167696_MD5.png" },
+                { answer: "ChangFeng", url: "Logo%20png/7193684773bf8fdd15e07f15629612fd_MD5.jpg" },
+                { answer: "Checker Corporation", url: "Logo%20png/a1835ccd8d9419bea4bda304a47362d5_MD5.png" },
+                { answer: "Chery", url: "Logo%20png/5438ecd4ab964e53d6b7cb1873a7d919_MD5.png" },
+                { answer: "Chevrolet", url: "Logo%20png/ee39d16212bd5ee2260e184d39193913_MD5.jpg" },
+                { answer: "Chiribiri", url: "Logo%20png/3d67afc5c41a90bcbc4edfdaa2c109d3_MD5.png" },
+                { answer: "Chrysler", url: "Logo%20png/18bf8b9b636ba887b1a41d083af5e210_MD5.png" },
+                { answer: "Cisitalia", url: "Logo%20png/cd9fd87c3d5d5bfa582a677d88da059e_MD5.png" },
+                { answer: "Citroën", url: "Logo%20png/a1ab26360ace52ed3b13c16bc6ccd517_MD5.png" },
+                { answer: "Cizeta", url: "Logo%20png/42650c09ef5f5a0d6884fc89a8f25ed8_MD5.png" },
+                { answer: "Cletrac", url: "Logo%20png/3d0bae9e1ca9726fc2176d9d1c3f1488_MD5.png" },
+                { answer: "Comarth", url: "Logo%20png/353de9692b9519f6422a2427db269dea_MD5.png" },
+                { answer: "Connaught Company", url: "Logo%20png/4350a0bb834ec2486f45252f8bc962c5_MD5.png" },
+                { answer: "Corbellati", url: "Logo%20png/b238e64010cc4361373e2db6a6998d5c_MD5.jpg" },
+                { answer: "Corre La Licorne", url: "Logo%20png/cf70730d7fb1516749b921c7eff67776_MD5.png" },
+                { answer: "Corvette", url: "Logo%20png/cd5503f6a12d143cbff4c329a5060e9d_MD5.png" },
+                { answer: "Cournil", url: "Logo%20png/ffb252c0a69e653b12b9581fed6bcc6d_MD5.png" },
+                { answer: "Crane Carrier Company", url: "Logo%20png/902c048125661ed111bbadb799e4f7e8_MD5.png" },
+                { answer: "Cupra", url: "Logo%20png/b7056b4b47b4bddca9758f9469811945_MD5.jpg" },
+                { answer: "Czinger", url: "Logo%20png/c1d961dbb5c2592f0a192645006b24c0_MD5.jpg" },
+                { answer: "Dacia", url: "Logo%20png/ceca77dfdf0cfb402c076a1f05c7798a_MD5.png" },
+                { answer: "Dadi", url: "Logo%20png/0ea4feae00d0b011ffd1e358917e96cc_MD5.jpg" },
+                { answer: "Daewoo", url: "Logo%20png/37ab53c4c4247766e5d2cb419525c0a2_MD5.png" },
+                { answer: "DAF", url: "Logo%20png/74bd7683af4a8d54c789f9be3cedf4af_MD5.jpg" },
+                { answer: "Daihatsu", url: "Logo%20png/1cad6c7143d6920620585735366f7b0c_MD5.jpg" },
+                { answer: "Daimler", url: "Logo%20png/302d73e9340a109310a15924099260d6_MD5.png" },
+                { answer: "Dale Earnhardt Inc.", url: "Logo%20png/ee188eb999a3978ddb74a8b9cadba3ba_MD5.png" },
+                { answer: "Dallara", url: "Logo%20png/ebb742c935099690c13e8cb1949a93d7_MD5.png" },
+                { answer: "Darracq", url: "Logo%20png/9c16c7419f6091048eb8455ef59abb1a_MD5.png" },
+                { answer: "Datsun", url: "Logo%20png/f2403394c8e61b199f40c4c44dafbdee_MD5.jpg" },
+                { answer: "David Brown", url: "Logo%20png/68c08eeed993f3b060b04dacc7f5403a_MD5.jpg" },
+                { answer: "Dax Cars", url: "Logo%20png/849f9403d7537dfc9a863b90ad6a737c_MD5.png" },
+                { answer: "DC2", url: "Logo%20png/43df7f3bddcd9db1cd36591bfcd85551_MD5.jpg" },
+                { answer: "De Dion-Bouton", url: "Logo%20png/a695afbffb4b2cdf01cb91734a4200d6_MD5.png" },
+                { answer: "De La Chapelle", url: "Logo%20png/02af951068f8c81ccc9468aee7842e82_MD5.png" },
+                { answer: "De Tomaso", url: "Logo%20png/11bfd091542404ea6440025da291176e_MD5.png" },
+                { answer: "Delage", url: "Logo%20png/3e252ba404bc3851926f548383b4a5ed_MD5.png" },
+                { answer: "Delahaye", url: "Logo%20png/432c1fcfa4c3bf7acdf7d00117984e21_MD5.png" },
+                { answer: "Delco Remy", url: "Logo%20png/acd02f0f715c6d8495dcd214eb1b20ee_MD5.png" },
+                { answer: "DeLorean Company", url: "Logo%20png/4433815959e71908681f688b507e5933_MD5.png" },
+                { answer: "Denza", url: "Logo%20png/fe04960793c5eea4a7c5f1ccd9864822_MD5.png" },
+                { answer: "Derbi", url: "Logo%20png/eb7044b9e5d5c05453434d0604290f88_MD5.png" },
+                { answer: "Derways", url: "Logo%20png/c18b0dbb5cf6d28bda0791ceaa7bb233_MD5.jpg" },
+                { answer: "DeSoto", url: "Logo%20png/0c9a3f6b9cd2d1385f1231a774e090d6_MD5.png" },
+                { answer: "Detroit Diesel", url: "Logo%20png/69dd949f2ea090bd5cfffb0c0a4de2c1_MD5.jpg" },
+                { answer: "Devonworks", url: "Logo%20png/5b36972a6771bf5eec49dbb0daa417fd_MD5.png" },
+                { answer: "DFSK", url: "Logo%20png/1b1d62c9dad9b82db8655371ffc029dd_MD5.png" },
+                { answer: "Diar", url: "Logo%20png/adcaf0a57b9a608e797a828c308365dd_MD5.png" },
+                { answer: "Diatto", url: "Logo%20png/df97950d5561bfaf8461c08bba4ed284_MD5.png" },
+                { answer: "DIM", url: "Logo%20png/488085109c2bbc70068dbaadbf56ccdf_MD5.png" },
+                { answer: "Dina", url: "Logo%20png/ceec73468aaf0f236b2f26a72fa9cad4_MD5.jpg" },
+                { answer: "Divco", url: "Logo%20png/18cdbecc92dcbae856243c11ff711a34_MD5.png" },
+                { answer: "DKW", url: "Logo%20png/a26a6db26eb84ca1b3900762db01d380_MD5.jpg" },
+                { answer: "Dodge Challenger", url: "Logo%20png/c8dee41fbdffd9d67d7370dc9f5aff4b_MD5.png" },
+                { answer: "Dodge Charger", url: "Logo%20png/f50e390d2cac448cd36eef593db25e73_MD5.png" },
+                { answer: "Dodge Demon", url: "Logo%20png/25ea13070085419e2c51f78df2aa6a9a_MD5.png" },
+                { answer: "Dodge Hellcat", url: "Logo%20png/dcf3218879ba4054d5d86ecfa766e0c0_MD5.png" },
+                { answer: "Dodge", url: "Logo%20png/1ad7d68205e2bbc974d36368ecd6770e_MD5.png" },
+                { answer: "Dodge Viper", url: "Logo%20png/371bc94b937190759e855292c9ab51f0_MD5.jpg" },
+                { answer: "Dolo", url: "Logo%20png/f3d7ef92b2248d62653dd5528a483079_MD5.png" },
+                { answer: "Dongfeng", url: "Logo%20png/216a5a5b7c1df7be6b367f62d9892e1f_MD5.jpg" },
+                { answer: "Doninvest", url: "Logo%20png/077b7b0b69f2cadf991a18d4dab52b0b_MD5.jpg" },
+                { answer: "Donkervoort", url: "Logo%20png/2ddfef7c6182811d54f85cc8ed8aeb28_MD5.png" },
+                { answer: "DR Automobiles", url: "Logo%20png/b6992c89101c2ba4a91d78b9c64d8758_MD5.png" },
+                { answer: "Drako", url: "Logo%20png/7d63504b060cf8d1fff13d2feca1c7c2_MD5.jpg" },
+                { answer: "DS", url: "Logo%20png/6ca502e2a57e6c298ca71fa0325f89b3_MD5.jpg" },
+                { answer: "DSD", url: "Logo%20png/86b3e9f7c7d7a289b6cf9d4f1548e711_MD5.png" },
+                { answer: "Ducati", url: "Logo%20png/3ca8f900cba00d4f993e50d4dd49b52c_MD5.png" },
+                { answer: "Duesenberg", url: "Logo%20png/0e3a3fd63fec4085a909cbc19a1f2c86_MD5.png" },
+                { answer: "Durant", url: "Logo%20png/611507c62c5c1bbe6a641e1d820d2171_MD5.png" },
+                { answer: "E-One", url: "Logo%20png/ee0362da6ff05f34d531ce58e97f7ac3_MD5.png" },
+                { answer: "e.Go", url: "Logo%20png/e4e2d604141c1d0edc0bcd41fe07542d_MD5.jpg" },
+                { answer: "Eadon Green", url: "Logo%20png/d38a3750e938b9be6417514cc0be9f6f_MD5.jpg" },
+                { answer: "Eagle", url: "Logo%20png/f47f07c949d2f204b787821910c03e5e_MD5.jpg" },
+                { answer: "EDAG", url: "Logo%20png/3067a651219550016d68a952f3f079b2_MD5.jpg" },
+                { answer: "Edfor Grand Sport", url: "Logo%20png/7c2ca8d810d512094819ec0968f18f92_MD5.png" },
+                { answer: "Edsel", url: "Logo%20png/5c4a6f003b4972a7cb22f90e74dffb5c_MD5.png" },
+                { answer: "Eicher", url: "Logo%20png/0361c1044ce8bc4a665890c2de4885ec_MD5.jpg" },
+                { answer: "Elaris", url: "Logo%20png/fcf630436c65ccbc4b550c1061efbf54_MD5.jpg" },
+                { answer: "Elemental", url: "Logo%20png/70afd4f63b7b84e0b4313b5701bd8b10_MD5.jpg" },
+                { answer: "Elizalde", url: "Logo%20png/3fa92002885f116b7f6c979d2b8c65dd_MD5.png" },
+                { answer: "Elmore", url: "Logo%20png/e0c597b862c7c5350434841e7ff38cd9_MD5.png" },
+                { answer: "Elva", url: "Logo%20png/41792f4cbebe919e664648abceeaebd6_MD5.jpg" },
+                { answer: "ELVO", url: "Logo%20png/ec02974308cb576def03492af7f3ca33_MD5.png" },
+                { answer: "Engler", url: "Logo%20png/a00f9e44c00e2ce1126cdb8263475d06_MD5.jpg" },
+                { answer: "Equus", url: "Logo%20png/4ab58c6e2ac820ba55d92a748dff3f28_MD5.png" },
+                { answer: "Etnerap", url: "Logo%20png/6c5a676c309dfa21101f983cedd36b14_MD5.png" },
+                { answer: "Eucort", url: "Logo%20png/03ea404ba9e2e04364385c42d66ae989_MD5.png" },
+                { answer: "EVO", url: "Logo%20png/6018041640d3c1a6675035ef7fb4b988_MD5.jpg" },
+                { answer: "Exagon Engineering", url: "Logo%20png/fcc7038915ae6892e8eef3d8006d21ec_MD5.png" },
+                { answer: "Exagon", url: "Logo%20png/f5fb1aa13c28c98c3ba6429278c886fd_MD5.png" },
+                { answer: "Exeed", url: "Logo%20png/05e651b46ecac0d979c820d4419f1a9b_MD5.png" },
+                { answer: "Facel Vega", url: "Logo%20png/f322974786ea28b0aa14369319e2d13b_MD5.png" },
+                { answer: "FAP", url: "Logo%20png/6c127d012a02422dfd988e7b690091ca_MD5.png" },
+                { answer: "Faraday Future", url: "Logo%20png/12e8176244db9a5142fb0967d876e9dd_MD5.jpg" },
+                { answer: "Faw", url: "Logo%20png/8cc0e58c8da3b7b7a41114c8bfed1a8a_MD5.png" },
+                { answer: "Felino", url: "Logo%20png/a2dac617d6964f419489d79bc0af993a_MD5.jpg" },
+                { answer: "Ferrari", url: "Logo%20png/dcd5df2c420c4ce564768af5a9a985ec_MD5.jpg" },
+                { answer: "Fiat", url: "Logo%20png/653bf8e3b82c90eb3c88617b73d47f2a_MD5.png" },
+                { answer: "Fioravanti", url: "Logo%20png/5252770bcdfd36c3288180e73ea3baa7_MD5.png" },
+                { answer: "Firebird", url: "Logo%20png/d0b4be54d992bf948b61e4942d3ed7f5_MD5.png" },
+                { answer: "Fisker", url: "Logo%20png/4f8c2fba2a950c421e0586b63a6b858a_MD5.png" },
+                { answer: "Fittipaldi", url: "Logo%20png/4dd556f19c88cea606435c1b51567fa5_MD5.jpg" },
+                { answer: "FOMM", url: "Logo%20png/9b619999913a8852231d5e9f04676cc3_MD5.jpg" },
+                { answer: "Force", url: "Logo%20png/bb68b2fd7e27aaa85f453efb97ada111_MD5.png" },
+                { answer: "Ford Bronco", url: "Logo%20png/de8d5783b930a361012238b6a4ea4167_MD5.png" },
+                { answer: "Ford F-150", url: "Logo%20png/8daf166ebf4d096860bb33371bf0a9d3_MD5.png" },
+                { answer: "Ford", url: "Logo%20png/4a3eab054cdbdd4187ccfe0baf947c67_MD5.png" },
+                { answer: "Forthing", url: "Logo%20png/4d6417f039c5c80b994c4176eb02449a_MD5.jpg" },
+                { answer: "Foton", url: "Logo%20png/efd838a5f4daff334731ad99d3b69884_MD5.jpg" },
+                { answer: "FPV", url: "Logo%20png/b7d463907a91d7f41e0b376b459fadfd_MD5.jpg" },
+                { answer: "Freightliner", url: "Logo%20png/ece1340a090d5dfe9a4da8deaa90881f_MD5.jpg" },
+                { answer: "FSO", url: "Logo%20png/c3db750e11e3046f30d0ff5e612788b5_MD5.jpg" },
+                { answer: "Fuqi", url: "Logo%20png/996a3b4e1f70d0fbadbf84a0efae07b3_MD5.jpg" },
+                { answer: "Futi", url: "Logo%20png/d0cd4bf11044b8d1d0c3a0af53efe20a_MD5.png" },
+                { answer: "GAC Group", url: "Logo%20png/9fc65d14cd8460c68ef05b8a975febbc_MD5.png" },
+                { answer: "Gardner Douglas", url: "Logo%20png/d18c240931517d16e13cd5338831c072_MD5.jpg" },
+                { answer: "Gatter", url: "Logo%20png/9d4cbc5e2d7458e3fb50bc8f1cdc9667_MD5.png" },
+                { answer: "GAZ", url: "Logo%20png/3a9641b12808dbcb7664cfda26a811ff_MD5.png" },
+                { answer: "Geely", url: "Logo%20png/837967bb9518ece1521e444f887d0f1f_MD5.png" },
+                { answer: "Gemballa", url: "Logo%20png/9eb69a49542ebe860e91c055a2527c06_MD5.jpg" },
+                { answer: "Genesis", url: "Logo%20png/41429efe3e7797138629d82f7017911a_MD5.png" },
+                { answer: "Genty", url: "Logo%20png/c9b667ef2f2244b1c247cda4c5de09a8_MD5.png" },
+                { answer: "Geo", url: "Logo%20png/1a34c201fff7f75146e30ddaa9dfdba4_MD5.jpg" },
+                { answer: "Geometry", url: "Logo%20png/3140490e7ac7ba81953c68b373cea1ba_MD5.png" },
+                { answer: "GFG Style", url: "Logo%20png/d6fa680debcf692652c06e0c789660a3_MD5.jpg" },
+                { answer: "Gilera", url: "Logo%20png/12c88bda20f90306c7910aa26b0a3d69_MD5.png" },
+                { answer: "Gillet", url: "Logo%20png/e8b539a0d70d822102d6782310150d12_MD5.jpg" },
+                { answer: "Ginetta", url: "Logo%20png/3f5516ff999383cd5a9ceafa09b0a8a1_MD5.png" },
+                { answer: "Glas", url: "Logo%20png/e534fa4018510d9c4610c17126fe8306_MD5.jpg" },
+                { answer: "Gleagle", url: "Logo%20png/012f3aa71a3f119c892154bfa5145409_MD5.png" },
+                { answer: "GM", url: "Logo%20png/67e3878431336fcfec374ffb5cc33cba_MD5.jpg" },
+                { answer: "GMC", url: "Logo%20png/ce29403c54db41455c378222cf909ec2_MD5.png" },
+                { answer: "Goliath", url: "Logo%20png/d5ab8b8b3323f17e4603854347b6a3ad_MD5.jpg" },
+                { answer: "Gordini", url: "Logo%20png/b7c87c44b63a780cc9cfeb08e613aa30_MD5.png" },
+                { answer: "Gordon Murray", url: "Logo%20png/4a2ea45bc27269609b762bb0bc6b072d_MD5.jpg" },
+                { answer: "Great Wall", url: "Logo%20png/f66280b37c5dda3286a3522f1f631104_MD5.jpg" },
+                { answer: "Grecav", url: "Logo%20png/3f590511a107a397a593a676f95463c0_MD5.png" },
+                { answer: "GTR", url: "Logo%20png/d8a4aabc75f4a381f927e927295d7097_MD5.png" },
+                { answer: "Gumpert", url: "Logo%20png/c9dd23cfeafd0882930d5a396f4df66e_MD5.png" },
+                { answer: "Hafei", url: "Logo%20png/a8886d0eb4f4627927cdf5efaa84b7a4_MD5.jpg" },
+                { answer: "Haima", url: "Logo%20png/8bb415b62f0579e8c2fb2ee4d3efb6cd_MD5.png" },
+                { answer: "Hansa", url: "Logo%20png/f31184d906ef08a9d90bfec97b0993af_MD5.jpg" },
+                { answer: "Harley-Davidson", url: "Logo%20png/d74886ac3e0f205bce2c1fa1c97be7ff_MD5.jpg" },
+                { answer: "Hartge", url: "Logo%20png/03ae5e030bd86e623b3085a1780ef680_MD5.jpg" },
+                { answer: "Haval", url: "Logo%20png/332953c74c7ccaa95171e37cd8740212_MD5.png" },
+                { answer: "Hawtai", url: "Logo%20png/2b5ffdcec521e2bd1f091b4393bc9997_MD5.jpg" },
+                { answer: "Hayabusa", url: "Logo%20png/0a4cac98f5bce4a4f775a2584be1ff09_MD5.jpg" },
+                { answer: "Hennessey", url: "Logo%20png/16720de153ec0a51613ed4268f6ba9dc_MD5.png" },
+                { answer: "Hero", url: "Logo%20png/53c457f8f802bab41071788b578dd583_MD5.jpg" },
+                { answer: "Hindustan", url: "Logo%20png/08b59ed7b7ccfb21a8d19dc24168b050_MD5.png" },
+                { answer: "Hino", url: "Logo%20png/5f542d656e1c30732fd562e587fc46e0_MD5.jpg" },
+                { answer: "HiPhi", url: "Logo%20png/1bd23a1b3d374b9054c800b6840491fe_MD5.png" },
+                { answer: "Hispano-Suiza", url: "Logo%20png/eb640164ce3003b4290d7f5b086ab7ce_MD5.png" },
+                { answer: "Holden", url: "Logo%20png/4e403dbe9c1d46768540bb54466e1c43_MD5.jpg" },
+                { answer: "Holt", url: "Logo%20png/1aa0c4d8a85786052aa95a233b1c50aa_MD5.png" },
+                { answer: "Hommell", url: "Logo%20png/91c00489fd6bef5a75532c022cbaee83_MD5.png" },
+                { answer: "Honda Civic", url: "Logo%20png/f35dd69c127b886693421e71f4415124_MD5.jpg" },
+                { answer: "Honda", url: "Logo%20png/259b6711fced52a3ce4e210db91803f3_MD5.png" },
+                { answer: "Hongqi", url: "Logo%20png/7e10debddf7510f695131b3a052d1ab5_MD5.png" },
+                { answer: "Horch", url: "Logo%20png/cb39a7ef438321d8ebd39673d0c7661b_MD5.jpg" },
+                { answer: "Horki", url: "Logo%20png/208ae932a7a278cf2d07ea1838767393_MD5.png" },
+                { answer: "Hradyesh", url: "Logo%20png/eae7ee65fb87a6e384965f192cca3719_MD5.png" },
+                { answer: "HSV", url: "Logo%20png/2b1a59d43f8aa086211219584ffd6749_MD5.jpg" },
+                { answer: "HTWO", url: "Logo%20png/5e5efa02062e9fc0c7ccb4ac597e1723_MD5.png" },
+                { answer: "HuangHai Auto", url: "Logo%20png/d3ca280ef53ba2c4a3615647c3323923_MD5.jpg" },
+                { answer: "Hudson", url: "Logo%20png/45350436a8d37a592b5924469e17b57d_MD5.png" },
+                { answer: "Hummer", url: "Logo%20png/ea8098b9e1aec74c2265ef5d1bd7dd0a_MD5.png" },
+                { answer: "Hurtan", url: "Logo%20png/36aaa5f2d40b4eefc0cba52f1726847b_MD5.png" },
+                { answer: "Hyundai", url: "Logo%20png/d51b56d955d605ed6b40459d2918f63e_MD5.png" },
+                { answer: "IBC Vehicles", url: "Logo%20png/5995ef89faf5df3a1af7d5a2413295c2_MD5.png" },
+                { answer: "IC Bus", url: "Logo%20png/6f72966b42c81beff81964915d516b69_MD5.jpg" },
+                { answer: "ICKX", url: "Logo%20png/8815a2db9f2fdea3e79dd62126732299_MD5.jpg" },
+                { answer: "ICML", url: "Logo%20png/d3bb99fb632fc0705cd6118bf2851567_MD5.png" },
+                { answer: "IFR Aspid", url: "Logo%20png/a1aebf0094fb4cd5a4af0b1d349d1736_MD5.png" },
+                { answer: "IH", url: "Logo%20png/44cb21a9b3e1eea3764a173f8078b04f_MD5.png" },
+                { answer: "IM", url: "Logo%20png/41f4f9a5ebe8b7e44d4cb361e6706a74_MD5.png" },
+                { answer: "Indiancycle", url: "Logo%20png/93d03e27bc383d851cec3c5b1de55dce_MD5.jpg" },
+                { answer: "INEOS Automotive", url: "Logo%20png/73d31e67e34cdea657a4a43eca7ccd18_MD5.jpg" },
+                { answer: "Infiniti", url: "Logo%20png/a680350c8583cd745528c8564dd49c8e_MD5.png" },
+                { answer: "Innocenti", url: "Logo%20png/d4586d9ba2083d14fc459696706f35f5_MD5.png" },
+                { answer: "International Trucks", url: "Logo%20png/a7a480b5a36e2aac58f7e0de3767f585_MD5.png" },
+                { answer: "Invicta Electric", url: "Logo%20png/003362e0acb194f9448ab90d94490b88_MD5.jpg" },
+                { answer: "Invicta", url: "Logo%20png/2dc269027dede316f2ec04dd2ea0c064_MD5.jpg" },
+                { answer: "Ioniq", url: "Logo%20png/a9b8667cecb6a55dc6a8e670dda9d652_MD5.png" },
+                { answer: "IPA", url: "Logo%20png/e129e3affe2adf4158fc6f782061d106_MD5.png" },
+                { answer: "Iran Khodro", url: "Logo%20png/aa7034f000de3d47ad88b31e829b66df_MD5.png" },
+                { answer: "Irizar", url: "Logo%20png/c263b52204257e5bd68bbca898ebc2a4_MD5.jpg" },
+                { answer: "Irmscher", url: "Logo%20png/5ad2e635d89783a892fbc2f4fc1cd8f2_MD5.jpg" },
+                { answer: "Isdera", url: "Logo%20png/54d4e6389274eb5f14732f57ad8bb168_MD5.png" },
+                { answer: "Iso", url: "Logo%20png/a8fbcab70f21045df87d4313184d1894_MD5.png" },
+                { answer: "Isotta Fraschini", url: "Logo%20png/a86285954964d464f6c6123c3e4b88b0_MD5.png" },
+                { answer: "Isuzu", url: "Logo%20png/d3848c2b16c4411f8da87bfdcb4a50d2_MD5.jpg" },
+                { answer: "Itala", url: "Logo%20png/4f6e23f351c994201a737e68633d5102_MD5.png" },
+                { answer: "Italdesign", url: "Logo%20png/78dd9eb04cf073b5e36ee2f6d9e96908_MD5.jpg" },
+                { answer: "Iveco", url: "Logo%20png/28c2cc6dcc589487a14bc17ebec5c068_MD5.png" },
+                { answer: "Izh", url: "Logo%20png/6d8a5bfbd6b5cdc183d7410fc615652d_MD5.jpg" },
+                { answer: "JAC", url: "Logo%20png/4197bf87cbea7966e09cdc1b4dc381a2_MD5.png" },
+                { answer: "Jaguar", url: "Logo%20png/07e02d4a2104aab4e7b011e9f1534d43_MD5.png" },
+                { answer: "Jawa", url: "Logo%20png/c1e0d406df9e60db402f1d11471b02ce_MD5.jpg" },
+                { answer: "JCB", url: "Logo%20png/7b3b61622c8d715a9a6e6c7f2c318c38_MD5.jpg" },
+                { answer: "JDM", url: "Logo%20png/577d7fdf880a80f93ce86820d4d9fd1d_MD5.jpg" },
+                { answer: "Jeep Gladiator", url: "Logo%20png/178124f76cbca57edd113b8057a90107_MD5.png" },
+                { answer: "Jeep", url: "Logo%20png/becde2f58ca639df8f560bc1d2959512_MD5.jpg" },
+                { answer: "Jeep Wrangler", url: "Logo%20png/c0f8ecf4bb16377e28ac43504a83b85c_MD5.png" },
+                { answer: "Jetour", url: "Logo%20png/638c785da227c61d71ecccd2803fda81_MD5.png" },
+                { answer: "Jidu", url: "Logo%20png/d7c16aefc284e6c9e385aa37fc0472b1_MD5.png" },
+                { answer: "Jinbei", url: "Logo%20png/e309a64b548358e9aad844f4680d302e_MD5.png" },
+                { answer: "JLR", url: "Logo%20png/d803284eb46d3fa6ef4d596430a6fd46_MD5.png" },
+                { answer: "JMC", url: "Logo%20png/6d0f0c2d667159720a85ddea7bff0710_MD5.jpg" },
+                { answer: "John Cooper Works", url: "Logo%20png/37281aaaee7b44361fcb2bf7a82c1ddf_MD5.png" },
+                { answer: "Joylong", url: "Logo%20png/06c84bdc99e88eba6cc36550d67555b2_MD5.png" },
+                { answer: "K-R-I-T Car", url: "Logo%20png/fbc3a21e095637edbe436719e6fd58b1_MD5.png" },
+                { answer: "Kaipan", url: "Logo%20png/5d6119fb39f2c54758996cb5c7eb2b9a_MD5.png" },
+                { answer: "Kaiser", url: "Logo%20png/9b8147546416835ae3718e2cd25a381e_MD5.jpg" },
+                { answer: "Kaiyi", url: "Logo%20png/07bb5831571df77235c28c4a9c028d1c_MD5.png" },
+                { answer: "KAMAZ", url: "Logo%20png/7f1849aed44cfdce1e5e9fd42377b14d_MD5.png" },
+                { answer: "Karlmann King", url: "Logo%20png/ca35fc80f9be4329a34144963cd1ccb1_MD5.jpg" },
+                { answer: "Karma", url: "Logo%20png/1f25fd1c09f142dd1fdce5d9645e1316_MD5.jpg" },
+                { answer: "Kawasaki", url: "Logo%20png/3d83f41dcbcaa6d6b148dab5302fe792_MD5.jpg" },
+                { answer: "Keating Supercars", url: "Logo%20png/7ef4f259e0b3526ecbb2f655578848d0_MD5.png" },
+                { answer: "Keinath", url: "Logo%20png/7e4f43d7a6b434886682a34cf69448cc_MD5.jpg" },
+                { answer: "Kenworth", url: "Logo%20png/21d1f339048a7b1b84de769918ff2926_MD5.jpg" },
+                { answer: "Kerala Automobiles Limited", url: "Logo%20png/6052d315aef19d6bd3c08d23e286e2ec_MD5.png" },
+                { answer: "KG Mobility", url: "Logo%20png/fb526ba189adc85e215788efcba74889_MD5.png" },
+                { answer: "KIA", url: "Logo%20png/7716c4360c313e43473f9f848607e242_MD5.jpg" },
+                { answer: "KIA Telluride", url: "Logo%20png/762dc983e8be0b9067f474bd65b89f0a_MD5.png" },
+                { answer: "Kimera Automobili", url: "Logo%20png/1f1a2aeb89c41aed7a1d25799ae3f515_MD5.jpg" },
+                { answer: "Knox Automobile", url: "Logo%20png/cb4c0d783f26cd3722d08dbc24eae505_MD5.png" },
+                { answer: "Koenigsegg", url: "Logo%20png/0cc00f345b33870772a409c80215789f_MD5.png" },
+                { answer: "Korres Engineering", url: "Logo%20png/e708da4315c5b15e81b12f9b6d620a2a_MD5.png" },
+                { answer: "KTM", url: "Logo%20png/5cb78edd08ee77abed267a8b7563d0d8_MD5.jpg" },
+                { answer: "Kubota", url: "Logo%20png/bedc1992f7c4009682b981e716e83e89_MD5.jpg" },
+                { answer: "Lada", url: "Logo%20png/b627887c3966560dd7d791cd2387bf57_MD5.png" },
+                { answer: "Lagonda", url: "Logo%20png/c533a54217cb1e48a6c58198c5f9c987_MD5.jpg" },
+                { answer: "Lamborghini", url: "Logo%20png/7558c9a52d59797a5946bfad0a4cdeda_MD5.png" },
+                { answer: "Lambretta", url: "Logo%20png/d53269e95560da184299af40437dc8ec_MD5.jpg" },
+                { answer: "Lancia", url: "Logo%20png/e5f3a11a36931832e7b317bf1ef81631_MD5.png" },
+                { answer: "Land Rover", url: "Logo%20png/0843c71a5fd27734c675a43d505e5771_MD5.png" },
+                { answer: "Landwind", url: "Logo%20png/df57ee01a655798d52d5a9e1231ba1f9_MD5.png" },
+                { answer: "LaSalle", url: "Logo%20png/ec82705d4558f895dc4fd6449332d391_MD5.png" },
+                { answer: "Lastun", url: "Logo%20png/9d22a150b6b2b6e1f6627f2f8665d331_MD5.png" },
+                { answer: "LAZ", url: "Logo%20png/839c34d6506131247883ed7799e6b4f9_MD5.png" },
+                { answer: "Lea-Francis", url: "Logo%20png/a0164d9726ea3a67f183e3c44397a9c8_MD5.png" },
+                { answer: "LeapMotor", url: "Logo%20png/ca5c5c7498b659175330e2b4677ad557_MD5.png" },
+                { answer: "LEVC", url: "Logo%20png/98a8be931800d84532769effe747548c_MD5.png" },
+                { answer: "Lexus", url: "Logo%20png/9ee8f1c0a7a86d6133424d8d1732ee58_MD5.png" },
+                { answer: "Lifan", url: "Logo%20png/0989454266ff23611dfa50ad58bf7622_MD5.jpg" },
+                { answer: "Lightyear", url: "Logo%20png/7c51ce68316c82a972264d6dce184958_MD5.png" },
+                { answer: "Ligier", url: "Logo%20png/33162e8c55796ab0ab33ff33130a2003_MD5.png" },
+                { answer: "Lincoln", url: "Logo%20png/89ffa4c6b0e7d85167dcbd210e2b7f5a_MD5.jpg" },
+                { answer: "Lister Company", url: "Logo%20png/8411ca5f9a0e9366091887c4ba4c6895_MD5.png" },
+                { answer: "LiXiang", url: "Logo%20png/f801ff36e08644d7f1070ebe53d3173a_MD5.png" },
+                { answer: "Lloyd", url: "Logo%20png/d9fe30ae073ba62858241200251fd787_MD5.jpg" },
+                { answer: "Lordstown", url: "Logo%20png/696f3babdbf4b67484b7f2e52988ae5a_MD5.jpg" },
+                { answer: "Lotec", url: "Logo%20png/4eff8cdd55c691651fa6bf73c8619d65_MD5.jpg" },
+                { answer: "Lotus", url: "Logo%20png/a7a1b4df63364481fb54f372a5243304_MD5.jpg" },
+                { answer: "LTI", url: "Logo%20png/44d73816b79018a394e43d65ebac6231_MD5.jpg" },
+                { answer: "Lucid", url: "Logo%20png/008e27b8b352badb87d52152c776bc5f_MD5.png" },
+                { answer: "Luxgen", url: "Logo%20png/15c646882521ed7745122f500972a1fb_MD5.png" },
+                { answer: "Lvchi Auto", url: "Logo%20png/591d49c04b4293574d7aebc2ed073e3c_MD5.jpg" },
+                { answer: "Lynk & Co", url: "Logo%20png/83853f0e77767cf1ad23e97b54626f94_MD5.png" },
+                { answer: "Mack", url: "Logo%20png/d59123fa91a0000e54839748197e0cec_MD5.jpg" },
+                { answer: "Magna Steyr", url: "Logo%20png/56243a5d5e1366132b7e5b85d99f6d7f_MD5.png" },
+                { answer: "Mahindra", url: "Logo%20png/f73cbe33ededfbc0414c0d93f87f474a_MD5.png" },
+                { answer: "MAN", url: "Logo%20png/b5bc9c9bf642c1021e1551cddf61a58d_MD5.jpg" },
+                { answer: "Manifattura Automobili Torino", url: "Logo%20png/1ee732273fdeb8b05a24ae427d20e860_MD5.png" },
+                { answer: "Mansory", url: "Logo%20png/d72a2a5f644f2bbeefa476900806c885_MD5.jpg" },
+                { answer: "Marcos", url: "Logo%20png/73b8bfc02826d9a7c3e5f095c72f617a_MD5.png" },
+                { answer: "Marlin", url: "Logo%20png/d73fafdc7938da88f2ae0f041c236abd_MD5.jpg" },
+                { answer: "Marquette", url: "Logo%20png/3df9f79a6d6b5676122d5d9d368fb9d3_MD5.png" },
+                { answer: "Marussia", url: "Logo%20png/5abdd50e6a3fb6c2de57a53ee65ddae0_MD5.png" },
+                { answer: "Maruti Suzuki", url: "Logo%20png/e9ef3ec7af416cbcbae8c82fa7709e1a_MD5.png" },
+                { answer: "Maschinenbau Kiel", url: "Logo%20png/ced7ea614a884d5dd16991cfad34f92c_MD5.png" },
+                { answer: "Maserati", url: "Logo%20png/e2d8fabb33156582975a2133c0f0e37a_MD5.png" },
+                { answer: "Mastretta", url: "Logo%20png/141487e810f1dca733a615322870238d_MD5.png" },
+                { answer: "Matford", url: "Logo%20png/f6abc86ece7421cf92754e950ddfcf46_MD5.png" },
+                { answer: "Matra Sports", url: "Logo%20png/027840dc0511cdf71facfce99a774aa6_MD5.png" },
+                { answer: "Maxus", url: "Logo%20png/07efc0cece5ddcbf588a86c48b9e037d_MD5.png" },
+                { answer: "Maybach", url: "Logo%20png/8e2b360a8e1e426b317ae3c646ae7f11_MD5.jpg" },
+                { answer: "MAZ", url: "Logo%20png/8a445b0c234c38fb213fcb0bc81c93d0_MD5.png" },
+                { answer: "Mazda", url: "Logo%20png/f3c9fdb9551daa22a7838cf71fb64d74_MD5.png" },
+                { answer: "Mazzanti Automobili", url: "Logo%20png/f268420d101a572e521de574b43676fc_MD5.png" },
+                { answer: "McLaren", url: "Logo%20png/001058ea90f1c90f1bd297a74be2749b_MD5.png" },
+                { answer: "McLaughlin", url: "Logo%20png/86c4217eb040f86f66cbd0edff212242_MD5.png" },
+                { answer: "MDI", url: "Logo%20png/f48c215d23186616e81f3ae7e8c22718_MD5.png" },
+                { answer: "Melkus", url: "Logo%20png/2a75163edc67742208ef547091ac171d_MD5.jpg" },
+                { answer: "Mercedes", url: "Logo%20png/7696c5f663681e2623751c6b88c68041_MD5.png" },
+                { answer: "Mercury", url: "Logo%20png/7a87a99382f6c595f3ef7ff1a706bc7f_MD5.jpg" },
+                { answer: "Merkur", url: "Logo%20png/04f18384d114edf796b0069023e42725_MD5.png" },
+                { answer: "Meteor", url: "Logo%20png/01b22fe36f5174fd9ca9f9cdd2cc9d1e_MD5.png" },
+                { answer: "Metrocab", url: "Logo%20png/935607b8fef526dc00cadf210ab119d9_MD5.jpg" },
+                { answer: "MEV", url: "Logo%20png/34699a4e23b731c176746b5e6bb2fd23_MD5.jpg" },
+                { answer: "MG", url: "Logo%20png/e5770e0194a611dd9d464c90b21e2301_MD5.jpg" },
+                { answer: "Micro", url: "Logo%20png/f772309de8630c63e2484ce6c70a126d_MD5.jpg" },
+                { answer: "Microcar", url: "Logo%20png/4be32a64bf1253187bb8f078254c71a9_MD5.jpg" },
+                { answer: "Milan", url: "Logo%20png/bc9e2837f80b29da7b4d256a2c3d4a4d_MD5.jpg" },
+                { answer: "MINE Mobility", url: "Logo%20png/d1e5196bb6affdf192b7db71226e8b44_MD5.jpg" },
+                { answer: "Minelli", url: "Logo%20png/b7b58e1d725b6c39f5fdd891295f3147_MD5.jpg" },
+                { answer: "Minerva Automobile", url: "Logo%20png/9ab3be5b8b1a08840f0a005201441b48_MD5.png" },
+                { answer: "MINI", url: "Logo%20png/47c43b2fc9ad18461735901bfc540c2e_MD5.jpg" },
+                { answer: "Mitsubishi", url: "Logo%20png/03d71ebbbbe0489bcf6d6ad83d822e4a_MD5.jpg" },
+                { answer: "Mitsuoka", url: "Logo%20png/f46bea3cafbeb6ee25ff62ce14765f9e_MD5.png" },
+                { answer: "MK Sportscars", url: "Logo%20png/97d349efe332ac592f46fddd7ea3ddcd_MD5.jpg" },
+                { answer: "Moke", url: "Logo%20png/315ebe8650a9423bf2dd79d730c6da88_MD5.jpg" },
+                { answer: "Monarch", url: "Logo%20png/b6959d9e9a1bf4d9f9ab042150d76faf_MD5.png" },
+                { answer: "Monte-Carlo Automobiles", url: "Logo%20png/441cb1a49ff3eebef98287ca43f72170_MD5.jpg" },
+                { answer: "Monteverdi", url: "Logo%20png/6ba8af3cebe07fd335600b9dd7486b99_MD5.png" },
+                { answer: "Morgan Company", url: "Logo%20png/4774693ce85ca535c9b6bbc612f0b343_MD5.png" },
+                { answer: "Moskvitch", url: "Logo%20png/9b69fee8382cebdf72ad6b316bc28161_MD5.png" },
+                { answer: "Moto Guzzi", url: "Logo%20png/ddb79f1c7882a8b934cb5c1bcaff9468_MD5.png" },
+                { answer: "Motortrade", url: "Logo%20png/7d1651dbe0768bc058390586b0d2c940_MD5.png" },
+                { answer: "MPM", url: "Logo%20png/074f1f39015609a9eccd15b82f8a7a52_MD5.png" },
+                { answer: "MTX", url: "Logo%20png/64ea049b33dc22db8c07a2ae24dc4844_MD5.png" },
+                { answer: "Multicar", url: "Logo%20png/6ac29e35c493d7c10dc106fba40ffe48_MD5.jpg" },
+                { answer: "Multix", url: "Logo%20png/49abec60ad162266b59f76df95545b5e_MD5.png" },
+                { answer: "Munro", url: "Logo%20png/cc2e8f913c85ec94b88cd92f47af3be3_MD5.jpg" },
+                { answer: "Mustang", url: "Logo%20png/d499d3d3968d988f3e29341c5b0f15a2_MD5.jpg" },
+                { answer: "MV Agusta", url: "Logo%20png/e2793b4ed6e303179f0fc243a771d537_MD5.jpg" },
+                { answer: "MW", url: "Logo%20png/2e66b62f48920dd9676456fc40d2182e_MD5.png" },
+                { answer: "NAG", url: "Logo%20png/f9e0ae8311c4c24bc9c7a48b19be1a49_MD5.jpg" },
+                { answer: "Nash", url: "Logo%20png/d9efbf46e9449844f34a61137237fdfc_MD5.png" },
+                { answer: "Navistar", url: "Logo%20png/f5449808cc6a1e3e930dfad2d5ae63c7_MD5.png" },
+                { answer: "Neoplan", url: "Logo%20png/3bf908fc11d6f549b9244fb9997b79c9_MD5.jpg" },
+                { answer: "NEVS", url: "Logo%20png/38386742322d6085744741973bd07dcd_MD5.png" },
+                { answer: "New Flyer Industries", url: "Logo%20png/cdff7bf2b62ceea5679f4d45921df44d_MD5.png" },
+                { answer: "Nio", url: "Logo%20png/217901a24389e136ebeebcf6a23e3fb8_MD5.png" },
+                { answer: "Nismo", url: "Logo%20png/2b4c033dc1c9cffa30e783f7b81550b4_MD5.jpg" },
+                { answer: "Nissan", url: "Logo%20png/d5f355ab59c462e817a66459e66b2145_MD5.jpg" },
+                { answer: "Noble", url: "Logo%20png/8a8a65527886906dd50b3cf126820a63_MD5.png" },
+                { answer: "Norton", url: "Logo%20png/9d5276fa58c43211f8b792378d0915f0_MD5.png" },
+                { answer: "NSU", url: "Logo%20png/0880ed453110dbb66dd3f5d95578d46b_MD5.png" },
+                { answer: "O.S.C.A.", url: "Logo%20png/19e5f5a962e2e36a27cc8c6a41368614_MD5.jpg" },
+                { answer: "Oakland", url: "Logo%20png/877602a8ea72fe799acd5dd7df9b0124_MD5.png" },
+                { answer: "Oldsmobile", url: "Logo%20png/c32dc0cc920ac4aa689c56f608b37627_MD5.jpg" },
+                { answer: "Oltcit", url: "Logo%20png/fdd03442c75d933ec97147ee44b7544a_MD5.png" },
+                { answer: "Oltena", url: "Logo%20png/335109687ddf3d0af8db600ef13a61f4_MD5.png" },
+                { answer: "Opel", url: "Logo%20png/9fb110868dc955ff72c0b16f615ca6d7_MD5.png" },
+                { answer: "Opel Performance Center", url: "Logo%20png/ac107309adca678c427133cf38bfdbf9_MD5.png" },
+                { answer: "ORA", url: "Logo%20png/5003134a270e4cdd9553992bcab4ad47_MD5.jpg" },
+                { answer: "Paccar", url: "Logo%20png/0d4e4e4260d481aae9bf93e3244e96d4_MD5.jpg" },
+                { answer: "Packard", url: "Logo%20png/99b07620cd4452e89512adac7b4bf661_MD5.jpg" },
+                { answer: "Pagani", url: "Logo%20png/0af58586c92d91ab6b167cf47495c2c8_MD5.png" },
+                { answer: "Panhard", url: "Logo%20png/1efd51939ed1e2605b010d6e7a6e030e_MD5.png" },
+                { answer: "Panoz", url: "Logo%20png/5ffdef160e3570af263206b662d75ac7_MD5.jpg" },
+                { answer: "Passport", url: "Logo%20png/9e2c58f173e67d3f7af4bedf73df914b_MD5.png" },
+                { answer: "PAZ", url: "Logo%20png/657a4385aae960a06ff94c505937963a_MD5.png" },
+                { answer: "Pegaso", url: "Logo%20png/4b2f93090ccbdd8a0cf4ef978060f178_MD5.jpg" },
+                { answer: "Perodua", url: "Logo%20png/50079249b4c0d89410fe64cce0e4c574_MD5.jpg" },
+                { answer: "Peterbilt", url: "Logo%20png/35786913c77243185d8ec1ee2b96b7e1_MD5.jpg" },
+                { answer: "Peugeot", url: "Logo%20png/70b5bfb47a29acb7181c83c53e4e6c9e_MD5.jpg" },
+                { answer: "PGO", url: "Logo%20png/a8373ca7e6a6e47c044e062a82fe19e1_MD5.png" },
+                { answer: "Piaggio", url: "Logo%20png/6c11b2cb4f3116c0ef5b5113900b424f_MD5.png" },
+                { answer: "Picasso", url: "Logo%20png/459e5f169e3055fa8b9ab88cbd890712_MD5.jpg" },
+                { answer: "Picchio Racing Cars", url: "Logo%20png/c8b8bd1581f622c8be7a1931733950a5_MD5.png" },
+                { answer: "Pininfarina", url: "Logo%20png/0db02e2f23e973096f0875741a0333ad_MD5.png" },
+                { answer: "Plymouth", url: "Logo%20png/b7dddc6a10fea8f4129b1e5d27eba682_MD5.jpg" },
+                { answer: "Polaris", url: "Logo%20png/ba1af7f1c70b887e5b43f595893cc9c0_MD5.jpg" },
+                { answer: "Polestar", url: "Logo%20png/d58a9f7e0b0e6a98f276559b0a6a88b6_MD5.jpg" },
+                { answer: "Pontiac", url: "Logo%20png/077be6293c0b12a047608938a3cf3a3a_MD5.jpg" },
+                { answer: "Porsche", url: "Logo%20png/06cb278e0568036c425aabe3abb3645f_MD5.png" },
+                { answer: "Portaro", url: "Logo%20png/e50ecfe05d191e76ac848a293fcca41d_MD5.png" },
+                { answer: "Praga", url: "Logo%20png/57049737d00a57003b0c3cec445c76ce_MD5.png" },
+                { answer: "Premier", url: "Logo%20png/3e5cbfc287efb0cb9f6ad1017fbb2dfa_MD5.jpg" },
+                { answer: "Prevost", url: "Logo%20png/15a8e7e69074d20ecc435e1bdf9534b7_MD5.png" },
+                { answer: "Prince Company", url: "Logo%20png/7e58e46816e43d3f1fb6d89ae963a39e_MD5.png" },
+                { answer: "Proton", url: "Logo%20png/54aee8e26513660087badd20ae8aa760_MD5.jpg" },
+                { answer: "Puch", url: "Logo%20png/25fa992ca2d4590afe46979ee9487bea_MD5.png" },
+                { answer: "Puma", url: "Logo%20png/5a74ec823278de16ae87eacd7900d953_MD5.jpg" },
+                { answer: "Puritalia Automobili", url: "Logo%20png/9111b9f3e0f7a3061e22c544dc2405f7_MD5.png" },
+                { answer: "Pyeonghwa", url: "Logo%20png/331259e3b6394b457773e1d5add3a21c_MD5.png" },
+                { answer: "Qiantu", url: "Logo%20png/3831d4439e53c55a7addec6469ef6172_MD5.jpg" },
+                { answer: "Qoros", url: "Logo%20png/cb217ebdf3ef4818093e52070b473ba6_MD5.png" },
+                { answer: "Quattro", url: "Logo%20png/58aee1ba73047c56f347de0491ef6665_MD5.jpg" },
+                { answer: "Queen", url: "Logo%20png/76ef647a1873743c6416f2d53c534384_MD5.png" },
+                { answer: "Qvale", url: "Logo%20png/8a019e0c36c87267916cd6aa506cf21e_MD5.jpg" },
+                { answer: "Radical", url: "Logo%20png/e65c354508904aa872944a370e202695_MD5.jpg" },
+                { answer: "RAESR", url: "Logo%20png/158fe95dc0c82819602d531ab920bfec_MD5.png" },
+                { answer: "RAF", url: "Logo%20png/17f4385f77ff61fee85e86b70728d2a9_MD5.png" },
+                { answer: "Rainier", url: "Logo%20png/dbe5115a372f3d5d9b0b48e8a20cc07b_MD5.png" },
+                { answer: "Ralliart", url: "Logo%20png/bb08a5a616ea9dc0b007f2e319f807b3_MD5.jpg" },
+                { answer: "Ram", url: "Logo%20png/06e82d752672a58975ba0fb73f7be1eb_MD5.png" },
+                { answer: "Ranger", url: "Logo%20png/194b979028267d626ac2870d28b6a3b5_MD5.png" },
+                { answer: "Ranz", url: "Logo%20png/30f836d6b69adda56694412c747f1ab1_MD5.png" },
+                { answer: "Ravon", url: "Logo%20png/271467cd2378cbc0223f3a2423738e67_MD5.jpg" },
+                { answer: "Razor", url: "Logo%20png/287bfba97a622328467543cfd44c22e5_MD5.jpg" },
+                { answer: "Rejo", url: "Logo%20png/4d3bcd8921cfc01da4f50e07fcec80a4_MD5.png" },
+                { answer: "Reliant", url: "Logo%20png/aa83187ca7061828cb4da0bf75142d8b_MD5.png" },
+                { answer: "Renault Korea", url: "Logo%20png/b25994baacda16e64e0eb45dbd33105a_MD5.png" },
+                { answer: "Renault", url: "Logo%20png/00b32a2f6117f999d0f6d60091980446_MD5.jpg" },
+                { answer: "Renault Sport", url: "Logo%20png/d681ac6b1628266234b88cfae9138d4e_MD5.png" },
+                { answer: "Renault Trucks", url: "Logo%20png/e4f3666fa4958669041bd5e2a6396d5a_MD5.jpg" },
+                { answer: "Rezvani", url: "Logo%20png/507d994fe1955926f204d9cadb280ec8_MD5.png" },
+                { answer: "Riley", url: "Logo%20png/82c0d4b782aae31b1754fe10835a63f5_MD5.png" },
+                { answer: "Rimac", url: "Logo%20png/ff79b34f5b735eca1187abd3e5a73cb4_MD5.jpg" },
+                { answer: "Rinspeed", url: "Logo%20png/8713c9b0c40577858ea84d82a74ba92b_MD5.png" },
+                { answer: "Rivian", url: "Logo%20png/ec80180c9cfac9c8cd412a12e9568417_MD5.png" },
+                { answer: "Robur", url: "Logo%20png/c8d9ee0576391622abb28394fec2f71c_MD5.jpg" },
+                { answer: "Roewe", url: "Logo%20png/b111fca0e2689c3045b9e8a43b42d38d_MD5.png" },
+                { answer: "Rolls-Royce", url: "Logo%20png/aa390eaab223a432fd9606d67c205d60_MD5.png" },
+                { answer: "Ronart Cars", url: "Logo%20png/1f14c48e06151a4e77137b555ba4177a_MD5.jpg" },
+                { answer: "Rossion", url: "Logo%20png/a3e7594f4412be17b93592c188ccbbed_MD5.jpg" },
+                { answer: "Rover", url: "Logo%20png/1a693c6c523b05db973828550174af1e_MD5.jpg" },
+                { answer: "Royal Enfield", url: "Logo%20png/062ce44c9225e0bf29c805269aa778be_MD5.jpg" },
+                { answer: "RUF", url: "Logo%20png/0d34d9fe04dbcb9b987fad6227110d7e_MD5.jpg" },
+                { answer: "Saab", url: "Logo%20png/59100e2df0fe71ab194526e069b7852d_MD5.jpg" },
+                { answer: "Sachsenring", url: "Logo%20png/28ed61bf07ff6ce4debb3daa5abcf326_MD5.png" },
+                { answer: "Saehan", url: "Logo%20png/7e0c1980a4888a0b5fd9b1497c8edc5c_MD5.png" },
+                { answer: "SAIC", url: "Logo%20png/607482097f12cb6034d73f883d608a30_MD5.png" },
+                { answer: "Saleen", url: "Logo%20png/b49e75928bdc68fe84820b96f60c4cc0_MD5.jpg" },
+                { answer: "Samsung Commercial Vehicles", url: "Logo%20png/2f96a421acecb77703445e4c651e1e71_MD5.png" },
+                { answer: "Santana", url: "Logo%20png/688f3def683de53d65a99f0e93eee141_MD5.png" },
+                { answer: "Saturn", url: "Logo%20png/ae86b2fc10db939d59ca34c7fb0723ed_MD5.jpg" },
+                { answer: "Sbarro", url: "Logo%20png/8bede461c90095744b2a3e2552837870_MD5.jpg" },
+                { answer: "Scania", url: "Logo%20png/1b8fdd119c2ede9bfda27690c418459f_MD5.jpg" },
+                { answer: "SCAT", url: "Logo%20png/2589cc6a7e4fb7edc7bb5114cb64c18e_MD5.png" },
+                { answer: "SCG", url: "Logo%20png/05b4a8743ae3ed51cba6be23fb024f7f_MD5.jpg" },
+                { answer: "Scion", url: "Logo%20png/303c36fee76390e878bb413999e7aab1_MD5.jpg" },
+                { answer: "Scripps-Booth", url: "Logo%20png/cec43ec7e5c136486f5912333dfdc66b_MD5.png" },
+                { answer: "Seat", url: "Logo%20png/4ac19ea64a349599ed28248c46ab9e1b_MD5.jpg" },
+                { answer: "SeAZ", url: "Logo%20png/b2ca4f2a480e287eb8f2e46ce470bcf7_MD5.jpg" },
+                { answer: "Seddon Atkinson", url: "Logo%20png/d11321abf3d9e685a7a48b95f4441fe5_MD5.png" },
+                { answer: "Seres", url: "Logo%20png/f08a51dc061921b8fcdae4923d82a6ca_MD5.jpg" },
+                { answer: "Setra", url: "Logo%20png/56b847a10fd89c344b07f0461dab27f2_MD5.jpg" },
+                { answer: "Shelby", url: "Logo%20png/71418535af94d3f59a0295ff8b78d1f6_MD5.png" },
+                { answer: "Sheridan", url: "Logo%20png/fcb634b4d4a541af41bf453f28974e25_MD5.png" },
+                { answer: "ShuangHuan", url: "Logo%20png/cc9f41cd1036362f89aea1d8d447d86f_MD5.jpg" },
+                { answer: "Simson", url: "Logo%20png/c7d57cd6ea555835d58377f1ac4313fe_MD5.jpg" },
+                { answer: "Sin Cars", url: "Logo%20png/5282e2889b518dba598f676278d55053_MD5.jpg" },
+                { answer: "Singer", url: "Logo%20png/0cf29f5761a52d6fa7cfcae1b6129a0e_MD5.jpg" },
+                { answer: "Škoda", url: "Logo%20png/47a23badb4ef4b754da45ac67a736239_MD5.png" },
+                { answer: "SMA", url: "Logo%20png/e1e67f955155ec802e8c34ec984c6737_MD5.jpg" },
+                { answer: "Smart", url: "Logo%20png/fe4b26f33b5be859a3cf456d6ef06603_MD5.png" },
+                { answer: "SNVI", url: "Logo%20png/38abffedcbd752b32a5e92781c38e337_MD5.png" },
+                { answer: "Società Piemontese Automobili", url: "Logo%20png/903178db4786ef9f95fa35a76360b1dc_MD5.png" },
+                { answer: "Società Torinese Automobili Rapid", url: "Logo%20png/5bc059df5018bb697ab2a0c0cfa77bd7_MD5.png" },
+                { answer: "Sono", url: "Logo%20png/04cf34ffc099c126fac4d60f2adbd100_MD5.jpg" },
+                { answer: "Soueast", url: "Logo%20png/b1f87b4f6bae27e58168474d49889580_MD5.jpg" },
+                { answer: "Spada Vetture Sport", url: "Logo%20png/ffe594195c7c6120ed20e79e97d25a29_MD5.png" },
+                { answer: "Spania GTA", url: "Logo%20png/e74552c0d36b85783b9125d61f1ec09d_MD5.png" },
+                { answer: "Spectre", url: "Logo%20png/bbbafe3f01f39ed45813da36a849e645_MD5.jpg" },
+                { answer: "Sportequipe", url: "Logo%20png/4be8c310ae4ce07c0c35e6bb297b95ba_MD5.jpg" },
+                { answer: "Spyker", url: "Logo%20png/96fe073b95beb8b2ad4131e49ed75995_MD5.jpg" },
+                { answer: "Spyros Panopoulos", url: "Logo%20png/4c9c000e27a9a890032f5e15f9408812_MD5.jpg" },
+                { answer: "SsangYong", url: "Logo%20png/c86570e1659fce0cbec16d936f0069ed_MD5.png" },
+                { answer: "SSC", url: "Logo%20png/cd4fdb0fbb833dd770de4aad068eedeb_MD5.jpg" },
+                { answer: "Stellantis", url: "Logo%20png/464b6236c532480e23fb8ee962bc358e_MD5.png" },
+                { answer: "Sterling", url: "Logo%20png/1bce603e6d0ae5a1ec9d80d08a291084_MD5.jpg" },
+                { answer: "Sterling Trucks", url: "Logo%20png/d0bf7acc8749b26bdb80f9f3c952cd0a_MD5.png" },
+                { answer: "STI", url: "Logo%20png/9e1ae78131855666d7c5c50fd0de7901_MD5.jpg" },
+                { answer: "Stoewer", url: "Logo%20png/cf13e6352543bde707aedcefdbeae5d1_MD5.png" },
+                { answer: "Street & Racing Technology", url: "Logo%20png/660669ee4dab6e860e8c12608e3d8a67_MD5.png" },
+                { answer: "Studebaker", url: "Logo%20png/b1c7e842070e9681d47afef9d4ab11cb_MD5.jpg" },
+                { answer: "Stutz Company", url: "Logo%20png/4d2e358038d87b42dc1298598987f470_MD5.png" },
+                { answer: "Subaru", url: "Logo%20png/a932b13d4c47365be16e0f048f9bff20_MD5.png" },
+                { answer: "Suda Electric", url: "Logo%20png/bc9c61402d9735f3addb2bf8c61a4ab4_MD5.jpg" },
+                { answer: "Suffolk Sportscars", url: "Logo%20png/d4f25a72d5ef67b95c727e0834daf420_MD5.jpg" },
+                { answer: "Sunbeam", url: "Logo%20png/428f9207c33e5fdf51016dfcd7546818_MD5.png" },
+                { answer: "Sungri Plant", url: "Logo%20png/a31d2c3d776369043837746e34dfdaaa_MD5.png" },
+                { answer: "Superformance", url: "Logo%20png/c4fcb7a07faa392abb23d7ed917f736e_MD5.png" },
+                { answer: "Suzuki", url: "Logo%20png/3b21d0b7e0cab7062d42505e9f0d8623_MD5.png" },
+                { answer: "Swaraj Mazda", url: "Logo%20png/15e92fc3485cda262c1c75b9ea5108e3_MD5.png" },
+                { answer: "TagAZ", url: "Logo%20png/c73ae9ab23796ab3f093c858ef47afb7_MD5.jpg" },
+                { answer: "Talbot", url: "Logo%20png/60be48fdb640b1c909d3bfeb0e9e3552_MD5.jpg" },
+                { answer: "Tata", url: "Logo%20png/066054bdc166f6555638aff0c1b7ef38_MD5.png" },
+                { answer: "Tatra", url: "Logo%20png/9438260de3105aed72b617262bedcf09_MD5.jpg" },
+                { answer: "Tauro Sport Auto", url: "Logo%20png/038c9144a529416255513d84579bdc16_MD5.png" },
+                { answer: "Taylor-Dunn", url: "Logo%20png/cd38b235a0a5939fc1f2a86cbf29d536_MD5.png" },
+                { answer: "TechArt", url: "Logo%20png/35ab085f134816b625652fe372762256_MD5.jpg" },
+                { answer: "Techrules", url: "Logo%20png/0cde7be5ae61ed8c59b1df25d0c1aff1_MD5.jpg" },
+                { answer: "Terradyne", url: "Logo%20png/48a2d4205e3d16b514e9728f9dcffbca_MD5.png" },
+                { answer: "Terrafugia", url: "Logo%20png/46a21358369ba0320a5c7ff8c64d4b19_MD5.png" },
+                { answer: "Tesla", url: "Logo%20png/2c7b5f78f3bc178afe0c7e35a23e7532_MD5.jpg" },
+                { answer: "Thairung", url: "Logo%20png/c27a7d71fe58c10823bffc091cc0debc_MD5.png" },
+                { answer: "Tianma", url: "Logo%20png/c63c405bac46fcf316e24a4619c76a02_MD5.jpg" },
+                { answer: "Tofas", url: "Logo%20png/97aafebdf0df136fac1ba8e88ebc9c7e_MD5.jpg" },
+                { answer: "Togg", url: "Logo%20png/65148236abde565359eedcfabfcb9b11_MD5.png" },
+                { answer: "Toyota", url: "Logo%20png/1426f1792f49cbbb5e6e6b46a8944931_MD5.jpg" },
+                { answer: "Toyota Supra", url: "Logo%20png/be1fa32830f88dce140b0357a960a61f_MD5.png" },
+                { answer: "Trabant", url: "Logo%20png/cddc73faea768fd81c60a14f8a561434_MD5.jpg" },
+                { answer: "Tramontana", url: "Logo%20png/942ba76a60e3e2c2d2b890943bac2ef2_MD5.png" },
+                { answer: "TREKOL", url: "Logo%20png/052a73819e0213542d9a996c87038a85_MD5.png" },
+                { answer: "Trion SuperCars", url: "Logo%20png/c6ae308d4efce63507a5cc3d61ed2392_MD5.png" },
+                { answer: "Triumph", url: "Logo%20png/a4c727deaabca94d83337211c6d8659e_MD5.jpg" },
+                { answer: "Troller", url: "Logo%20png/fc5771457c9e14527d6c8d16811e87d3_MD5.png" },
+                { answer: "Trumpchi", url: "Logo%20png/033122aa0d8cc8f7efa7346d3e76a000_MD5.jpg" },
+                { answer: "TUGA Innovations", url: "Logo%20png/076f5be721df806869a354f3fd1de644_MD5.png" },
+                { answer: "Turcat-Méry", url: "Logo%20png/5d058c9d03cd1587db69110c1cd8305d_MD5.png" },
+                { answer: "TVR", url: "Logo%20png/8b92d28f3179238ac2124bd439d2cb2f_MD5.jpg" },
+                { answer: "TVS", url: "Logo%20png/43d1205e004ff9233886dd07901761b0_MD5.jpg" },
+                { answer: "Twentieth Century Car Corporation", url: "Logo%20png/a672e080644a5074c989b8c35a5c9941_MD5.png" },
+                { answer: "UAZ", url: "Logo%20png/b339cbc6fb935a388cc63cba5fd519a1_MD5.png" },
+                { answer: "UD", url: "Logo%20png/5605b519ed5a2d6be94870c48c0c064e_MD5.jpg" },
+                { answer: "Ultima Sports", url: "Logo%20png/b1285ef058e2538b63d2d58d54d9e8ae_MD5.jpg" },
+                { answer: "UMM", url: "Logo%20png/1d4bc2c3efc998e36fe2579f6c6ffb59_MD5.png" },
+                { answer: "Unic", url: "Logo%20png/b650319728afd635b34c574d5ee28b99_MD5.png" },
+                { answer: "Uniti", url: "Logo%20png/da11df9d1d1820740fc837f74d62c70d_MD5.png" },
+                { answer: "Ursus", url: "Logo%20png/d90039ff61cc5ffa7ea4e354ab9aeca8_MD5.png" },
+                { answer: "UzAuto", url: "Logo%20png/30ee066b5aa4ff2c348e43e090cb206a_MD5.png" },
+                { answer: "Vanderhall", url: "Logo%20png/00716699e6494bc26d226b67c236380c_MD5.jpg" },
+                { answer: "Vauxhall", url: "Logo%20png/b8039a0a9019ac24842737df32530231_MD5.png" },
+                { answer: "Vector", url: "Logo%20png/d507ab41efd4c8e6b2398688921abbfd_MD5.jpg" },
+                { answer: "Vehicle Factory Jabalpur", url: "Logo%20png/5fdafce58ab8e0f13e4a4fb77e494ffa_MD5.png" },
+                { answer: "Velorex", url: "Logo%20png/84655fdfa71cd10a75ffb89b37068f75_MD5.png" },
+                { answer: "Vencer", url: "Logo%20png/87eaa6bacf226391066b20fa7b10656c_MD5.png" },
+                { answer: "Venturi", url: "Logo%20png/a6b99fbd4a0ec2e3d3bec147bd1103c3_MD5.jpg" },
+                { answer: "Vespa", url: "Logo%20png/4ab0634b63954e3c6676e2eb007ba45d_MD5.jpg" },
+                { answer: "Victory", url: "Logo%20png/1edde69436c3a369506798abc169b434_MD5.jpg" },
+                { answer: "VinFast", url: "Logo%20png/b13ad042725ca0c3566fcc327a0b97e5_MD5.jpg" },
+                { answer: "VLF", url: "Logo%20png/a08fc5f56846f07a69a323733bcbf461_MD5.jpg" },
+                { answer: "Volkswagen", url: "Logo%20png/99e40a06e113f4379e091c30bd8bc54d_MD5.jpg" },
+                { answer: "Volvo", url: "Logo%20png/ddc7f42c9b47dd6984587d37ce2a93dc_MD5.png" },
+                { answer: "Voyah", url: "Logo%20png/d8bb090d392829b5f7f0617ca1ec0c21_MD5.png" },
+                { answer: "VUHL", url: "Logo%20png/9e06e26744795cd4da5378df23087b9b_MD5.jpg" },
+                { answer: "VW Porsche", url: "Logo%20png/e990befba61bc8117177b47dbd971fc1_MD5.jpg" },
+                { answer: "W", url: "Logo%20png/4286fe80916f1d55c9490891db6f3c9c_MD5.jpg" },
+                { answer: "Wanderer Werke", url: "Logo%20png/01b5dfb6aee7d705c48f75fcdc65d3c1_MD5.jpg" },
+                { answer: "Wartburg", url: "Logo%20png/fdfab829877e000d8e564de3f3896a36_MD5.jpg" },
+                { answer: "Weltmeister", url: "Logo%20png/1566f06e00363d301515203e4eefad01_MD5.png" },
+                { answer: "West Coast Customs", url: "Logo%20png/5992b25bcfa8d0259312d1e0c1fd31ab_MD5.jpg" },
+                { answer: "Western Star", url: "Logo%20png/bb65c87a7716ba58d56fc3e876d6952a_MD5.jpg" },
+                { answer: "Westfield", url: "Logo%20png/d040c240ad18c439b79eed44a5c98b65_MD5.jpg" },
+                { answer: "WEY", url: "Logo%20png/e256a5faa2aee8b7399f0438cd5a5f92_MD5.jpg" },
+                { answer: "Wiesmann", url: "Logo%20png/29c9c18412cd5ac07c1f2650e824ae69_MD5.jpg" },
+                { answer: "Xiaomi", url: "Logo%20png/a8170d3c44d52663d1ee6696b36692e9_MD5.png" },
+                { answer: "XinKai", url: "Logo%20png/aa2ecd4cee42e1434bef863a7e461efa_MD5.jpg" },
+                { answer: "XPeng", url: "Logo%20png/93032e5be0881c6b36a4a5af106b98e7_MD5.png" },
+                { answer: "Yamaha", url: "Logo%20png/36e6a8b7bddd28ec7614517df42ae11d_MD5.png" },
+                { answer: "Yuanhang", url: "Logo%20png/2183f5fa20eb5b7b249da2512bb75412_MD5.png" },
+                { answer: "Zacua", url: "Logo%20png/ce8fdbd4f82779af5ef67d4e8d189a83_MD5.jpg" },
+                { answer: "Zastava", url: "Logo%20png/36d1e4a8934131e0a7158d0482efce69_MD5.jpg" },
+                { answer: "ZAZ", url: "Logo%20png/a2b5d58c449a5d51bb4463eb851517bd_MD5.jpg" },
+                { answer: "Zeekr", url: "Logo%20png/44e298e51fa893bfb6b4f4e5abab339f_MD5.png" },
+                { answer: "Zenos Cars", url: "Logo%20png/b22cf322886dad588a331fc63127657d_MD5.jpg" },
+                { answer: "Zenvo", url: "Logo%20png/dbbe2e99d4cb432e0956e7f7d3950bc0_MD5.png" },
+                { answer: "Zerocycles", url: "Logo%20png/68c7e1f83d528576faf06e377ec5461e_MD5.jpg" },
+                { answer: "Zhidou", url: "Logo%20png/16628a78af12997cf43acc7e446cd703_MD5.jpg" },
+                { answer: "ZIL", url: "Logo%20png/2fc24bf8c43100e7ef8f7fd59c1d1a55_MD5.jpg" },
+                { answer: "Zotye", url: "Logo%20png/353c798404fff9061265baf4a628198c_MD5.png" },
+                { answer: "ZX Auto", url: "Logo%20png/4c50600d372d0f4eac75cd079a8dd572_MD5.jpg" }
+            ]
+        };
+        /* ================= КОНЕЦ БЛОКА ДАННЫХ ======================= */
+
+        // Состояние приложения
+        let currentMode = null;
+        let questionsList = [];
+        let currentQuestionIndex = 0;
+        
+        let totalAsked = 0;
+        let correctAnswersCount = 0;
+        
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let isPaused = false;
+        let isAnswering = false; // Блокировка кнопок во время анимации
+
+        // Инициализация при загрузке
+        window.onload = () => {
+            updateFontSize(40); // Выставляем 40px по умолчанию
+        };
+
+        // --- Управление интерфейсом и навигация ---
+
+        function toggleMenu() {
+            const menu = document.getElementById('menu-overlay');
+            menu.classList.toggle('active');
+        }
+
+        function handleMenuOverlayClick(event) {
+            if (event.target.id === 'menu-overlay') {
+                toggleMenu();
+            }
+        }
+
+        function updateFontSize(size) {
+            document.documentElement.style.setProperty('--font-size', size + 'px');
+        }
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function goToStart() {
+            stopTimer();
+            currentMode = null; // Сбрасываем режим
+            switchScreen('start-screen');
+            toggleMenu();
+        }
+
+        function startQuiz(mode) {
+            currentMode = mode;
+            questionsList = [...CAR_DATA.emblems]; // В обоих режимах бренд берем из списка emblems
+            // Перемешиваем вопросы
+            questionsList.sort(() => Math.random() - 0.5); 
+            
+            currentQuestionIndex = 0;
+            switchScreen('quiz-screen');
+            loadQuestion();
+            
+            if (!timerInterval) {
+                startTimer();
+            }
+        }
+
+        // --- Логика Викторины ---
+
+        function loadQuestion() {
+            isAnswering = false;
+            
+            // Если вопросы закончились, начинаем сначала (зацикливаем)
+            if (currentQuestionIndex >= questionsList.length) {
+                currentQuestionIndex = 0;
+                questionsList.sort(() => Math.random() - 0.5);
+            }
+
+            const question = questionsList[currentQuestionIndex];
+            
+            const imageContainer = document.getElementById('question-image');
+            const optionsContainer = document.getElementById('options-container');
+            
+            // Показываем индикатор загрузки и скрываем старые кнопки
+            imageContainer.innerHTML = '<div class="loader">Загрузка изображения...</div>';
+            optionsContainer.innerHTML = '';
+            
+            const img = new Image();
+            
+            // Вынесем функцию успешной загрузки фото (URL мог прийти из сети)
+            const handleImageReady = () => {
+                // Прерываем отрисовку, если пользователь уже нажал "На главную"
+                if (!currentMode) return;
+                
+                imageContainer.innerHTML = '';
+                imageContainer.appendChild(img);
+
+                // Генерируем варианты ответов: 1 правильный + 3 случайных неправильных
+                const allAnswers = [...new Set(questionsList.map(q => q.answer))];
+                const wrongAnswers = allAnswers.filter(a => a !== question.answer).sort(() => 0.5 - Math.random()).slice(0, 3);
+                const shuffledOptions = [question.answer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+
+                shuffledOptions.forEach(optionText => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.innerText = optionText;
+                    btn.onclick = (e) => handleAnswer(e.target, optionText, question.answer);
+                    optionsContainer.appendChild(btn);
+                });
+
+                // Увеличиваем счетчик показанных вопросов
+                totalAsked++;
+                updateStatsUI();
+            };
+            
+            img.onload = handleImageReady;
+            
+            img.onerror = () => {
+                if (!currentMode) return;
+                imageContainer.innerHTML = '<div class="loader" style="color: red;">Ошибка загрузки. Пропуск...</div>';
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    loadQuestion();
+                }, 1500);
+            };
+            
+            if (currentMode === 'emblems') {
+                img.src = question.url;
+            } else if (currentMode === 'internet') {
+                // Асинхронно ищем картинку, затем подставляем в src
+                fetchCarImageFromWeb(question.answer).then(url => {
+                    img.src = url;
+                });
+            }
+        }
+
+        // Поиск фото автомобиля в интернете (используем Wikimedia Commons для поиска именно фотографий, а не статей)
+        async function fetchCarImageFromWeb(brand) {
+            // Очищаем название от корпоративных суффиксов, чтобы поиск машины был точнее
+            const cleanBrand = brand.replace(/Motors?|Corporation|Group|Auto|Company|Inc\.?/ig, '').trim();
+            
+            // Ищем в Wikimedia Commons. Указываем filetype:bitmap, чтобы исключить векторные логотипы (SVG).
+            // Добавляем слова "car OR vehicle", чтобы находить именно машины, а не портреты людей.
+            const searchQuery = encodeURIComponent(`filetype:bitmap "${cleanBrand}" (car OR vehicle)`);
+            const apiUrl = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${searchQuery}&gsrlimit=10&prop=imageinfo&iiprop=url&iiurlwidth=500`;
+            
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                if (data.query && data.query.pages) {
+                    const pages = Object.values(data.query.pages);
+                    // Ищем первое фото, url которого не содержит слова 'logo' или 'emblem', чтобы избежать явных подсказок
+                    const pageWithImage = pages.find(p => {
+                        if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].thumburl) {
+                            const url = p.imageinfo[0].thumburl.toLowerCase();
+                            return !url.includes('logo') && !url.includes('emblem') && !url.includes('badge');
+                        }
+                        return false;
+                    });
+                    
+                    if (pageWithImage) {
+                        return pageWithImage.imageinfo[0].thumburl;
+                    }
+                }
+                // Заглушка, если фото вообще не найдено
+                return `https://via.placeholder.com/500x300/dddddd/333333?text=${encodeURIComponent('Фото не найдено: ' + cleanBrand)}`;
+            } catch (error) {
+                console.error("Ошибка поиска фото:", error);
+                return `https://via.placeholder.com/500x300/ffdddd/ff0000?text=${encodeURIComponent('Ошибка сети')}`;
+            }
+        }
+
+        function handleAnswer(btnElement, selectedAnswer, correctAnswer) {
+            if (isAnswering || isPaused) return;
+            isAnswering = true;
+
+            const buttons = document.querySelectorAll('.option-btn');
+            
+            if (selectedAnswer === correctAnswer) {
+                // Правильный ответ
+                btnElement.classList.add('correct');
+                correctAnswersCount++;
+                shootConfetti();
+            } else {
+                // Неправильный ответ
+                btnElement.classList.add('incorrect');
+                // Подсвечиваем правильный ответ обводкой
+                buttons.forEach(btn => {
+                    if (btn.innerText === correctAnswer) {
+                        btn.classList.add('correct-outline');
+                    }
+                });
+            }
+
+            updateStatsUI();
+            
+            // Переход к следующему вопросу через паузу в 1.5 секунды
+            setTimeout(() => {
+                currentQuestionIndex++;
+                loadQuestion();
+            }, 1500);
+        }
+
+        // --- Таймер и Статистика ---
+
+        function updateStatsUI() {
+            document.getElementById('total-asked').innerText = totalAsked;
+            document.getElementById('correct-answers').innerText = correctAnswersCount;
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timerSeconds++;
+                    document.getElementById('timer').innerText = formatTime(timerSeconds);
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById('pause-btn');
+            pauseBtn.innerText = isPaused ? "Возобновить" : "Пауза";
+            
+            if (isPaused) {
+                document.getElementById('question-image').style.opacity = '0.1'; // Скрываем вопрос на паузе
+            } else {
+                document.getElementById('question-image').style.opacity = '1';
+            }
+        }
+
+        function resetApp() {
+            totalAsked = 0;
+            correctAnswersCount = 0;
+            timerSeconds = 0;
+            isPaused = false;
+            
+            document.getElementById('timer').innerText = "00:00";
+            document.getElementById('pause-btn').innerText = "Пауза";
+            updateStatsUI();
+            
+            if (currentMode) {
+                currentQuestionIndex = 0;
+                loadQuestion();
+                document.getElementById('question-image').style.opacity = '1';
+            }
+            toggleMenu();
+        }
+
+        // --- Эффект Серпантина (Confetti) ---
+
+        function shootConfetti() {
+            const container = document.getElementById('confetti-container');
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800', '#FF5722'];
+            
+            for (let i = 0; i < 60; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti-piece';
+                
+                // Случайная позиция, цвет и скорость
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                confetti.style.transform = `scale(${Math.random() * 0.5 + 0.5})`;
+                
+                container.appendChild(confetti);
+                
+                // Удаляем элемент после завершения анимации
+                setTimeout(() => {
+                    confetti.remove();
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

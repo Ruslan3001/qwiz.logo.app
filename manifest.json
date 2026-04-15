@@ -1,0 +1,17 @@
+{
+  "name": "Car Brand Quiz",
+  "short_name": "Car Quiz",
+  "description": "Викторина на знание автомобильных марок",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f4f9",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
