@@ -293,6 +293,7 @@
             <button class="close-btn" onclick="toggleMenu()">×</button>
             <button onclick="resetApp()">Сбросить прогресс</button>
             <button id="pause-btn" onclick="togglePause()">Пауза</button>
+            <button onclick="updatePhotosCache(true)">Обновить базу фото</button>
             <div>
                 <label for="font-size-input">Размер шрифта (px):</label>
                 <input type="number" id="font-size-input" value="40" min="10" max="100" onchange="updateFontSize(this.value)">
@@ -1011,6 +1012,7 @@
         /* ================= КОНЕЦ БЛОКА ДАННЫХ ======================= */
 
         // Состояние приложения
+        let CAR_PHOTOS = {};
         let currentMode = null;
         let questionsList = [];
         let currentQuestionIndex = 0;
@@ -1024,9 +1026,41 @@
         let isAnswering = false; // Блокировка кнопок во время анимации
 
         // Инициализация при загрузке
-        window.onload = () => {
+        window.onload = async () => {
             updateFontSize(40); // Выставляем 40px по умолчанию
+            await initPhotosData(); // Загружаем базу ссылок на фото
         };
+
+        async function initPhotosData() {
+            const cachedData = localStorage.getItem('carPhotosData');
+            if (cachedData) {
+                try {
+                    CAR_PHOTOS = JSON.parse(cachedData);
+                    console.log('База фото загружена из кэша устройства.');
+                    return;
+                } catch (e) {
+                    console.error('Ошибка чтения кэша', e);
+                }
+            }
+            await updatePhotosCache(false);
+        }
+
+        async function updatePhotosCache(showAlert = false) {
+            try {
+                // Добавляем параметр 'no-store' чтобы точно скачать свежий файл с сервера
+                const response = await fetch('photos_data.json', { cache: 'no-store' });
+                if (!response.ok) throw new Error('Файл не найден');
+                
+                CAR_PHOTOS = await response.json();
+                localStorage.setItem('carPhotosData', JSON.stringify(CAR_PHOTOS));
+                
+                if (showAlert) alert('База фотографий успешно скачана и сохранена на устройстве!');
+                console.log('Данные фото скачаны из файла и сохранены в кэш.');
+            } catch (error) {
+                console.error("Ошибка обновления базы фото:", error);
+                if (showAlert) alert('Не удалось загрузить файл photos_data.json. Проверьте соединение.');
+            }
+        }
 
         // --- Управление интерфейсом и навигация ---
 
@@ -1141,39 +1175,48 @@
             }
         }
 
-        // Поиск фото автомобиля в интернете (используем Wikimedia Commons для поиска именно фотографий, а не статей)
+        // Функция генерации картинки-заглушки (работает мгновенно без интернета)
+        function getFallbackImage(text) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300"><rect width="100%" height="100%" fill="#eeeeee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#333333">${text}</text></svg>`;
+            return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+        }
+
         async function fetchCarImageFromWeb(brand) {
             // Очищаем название от корпоративных суффиксов, чтобы поиск машины был точнее
             const cleanBrand = brand.replace(/Motors?|Corporation|Group|Auto|Company|Inc\.?/ig, '').trim();
             
-            // Ищем в Wikimedia Commons. Указываем filetype:bitmap, чтобы исключить векторные логотипы (SVG).
-            // Добавляем слова "car OR vehicle", чтобы находить именно машины, а не портреты людей.
-            const searchQuery = encodeURIComponent(`filetype:bitmap "${cleanBrand}" (car OR vehicle)`);
-            const apiUrl = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${searchQuery}&gsrlimit=10&prop=imageinfo&iiprop=url&iiurlwidth=500`;
-            
+            // 1. ПРОВЕРКА ЛОКАЛЬНОЙ БАЗЫ: Если ссылка есть в нашей таблице, отдаем её моментально
+            if (CAR_PHOTOS && CAR_PHOTOS[brand] && CAR_PHOTOS[brand].length > 0) {
+                const urls = CAR_PHOTOS[brand];
+                return urls[Math.floor(Math.random() * urls.length)]; // Берем случайное фото из заготовленных
+            }
+
+            // 2. РЕЗЕРВНЫЙ ПОИСК: Если в базе пусто, делаем быстрый запрос к API Википедии (origin=* обходит CORS)
+            const searchQuery = encodeURIComponent(`"${cleanBrand}" автомобиль`);
+            const apiUrl = `https://ru.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${searchQuery}&gsrlimit=5&prop=imageinfo&iiprop=url&iiurlwidth=500`;
+
             try {
                 const response = await fetch(apiUrl);
                 const data = await response.json();
+                
                 if (data.query && data.query.pages) {
                     const pages = Object.values(data.query.pages);
-                    // Ищем первое фото, url которого не содержит слова 'logo' или 'emblem', чтобы избежать явных подсказок
-                    const pageWithImage = pages.find(p => {
+                    for (const p of pages) {
                         if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].thumburl) {
-                            const url = p.imageinfo[0].thumburl.toLowerCase();
-                            return !url.includes('logo') && !url.includes('emblem') && !url.includes('badge');
+                            const url = p.imageinfo[0].thumburl;
+                            // Отсеиваем логотипы (векторные изображения)
+                            if (!url.toLowerCase().endsWith('.svg')) {
+                                return url;
+                            }
                         }
-                        return false;
-                    });
-                    
-                    if (pageWithImage) {
-                        return pageWithImage.imageinfo[0].thumburl;
                     }
                 }
-                // Заглушка, если фото вообще не найдено
-                return `https://via.placeholder.com/500x300/dddddd/333333?text=${encodeURIComponent('Фото не найдено: ' + cleanBrand)}`;
+                
+                // Надежная заглушка без интернета, если фото не найдено
+                return getFallbackImage(`Фото не найдено: ${cleanBrand}`);
             } catch (error) {
                 console.error("Ошибка поиска фото:", error);
-                return `https://via.placeholder.com/500x300/ffdddd/ff0000?text=${encodeURIComponent('Ошибка сети')}`;
+                return getFallbackImage('Ошибка сети или поиск занял слишком много времени');
             }
         }
 
