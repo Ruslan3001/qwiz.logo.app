@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Отключаем Referer для обхода блокировок (hotlink protection) со стороны сторонних серверов -->
+    <meta name="referrer" content="no-referrer">
     <title>Car Quiz App</title>
     
     <link rel="manifest" href="manifest.json">
@@ -101,6 +103,11 @@
             flex-direction: column;
             gap: 20px;
             box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            overflow-y: auto;
+        }
+
+        .menu-content > * {
+            flex-shrink: 0;
         }
 
         .close-btn {
@@ -110,24 +117,61 @@
             background: none;
             border: none;
         }
-
-        .menu-content button, .menu-content label {
-            font-size: 1.2rem;
-            padding: 10px;
-            border: var(--btn-border);
+        .menu-content button {
+            font-size: 1.1rem;
+            padding: 12px 10px;
+            border: 2px solid #ccc;
             border-radius: 8px;
             background-color: white;
             cursor: pointer;
             text-align: center;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: opacity 0.2s;
+        }
+        .menu-content button:active {
+            opacity: 0.7;
         }
 
-        .menu-content input[type="number"] {
+        /* Цветовые схемы для кнопок меню */
+        .btn-danger { background-color: #ffebee !important; border-color: #ef9a9a !important; color: #c62828; }
+        .btn-warning { background-color: #fff8e1 !important; border-color: #ffe082 !important; color: #f57f17; }
+        .btn-info { background-color: #e3f2fd !important; border-color: #90caf9 !important; color: #1565c0; }
+        .btn-success { background-color: #e8f5e9 !important; border-color: #a5d6a7 !important; color: #2e7d32; }
+
+        /* Контейнеры для элементов управления в меню (шрифт, база) */
+        .menu-control {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .menu-control label {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #444;
+            cursor: default;
+        }
+
+        .menu-control input[type="number"], .menu-control select {
             width: 100%;
             padding: 10px;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             border: 2px solid #ccc;
-            border-radius: 8px;
-            margin-top: 5px;
+            border-radius: 6px;
+            background-color: #fff;
+            outline: none;
+        }
+        
+        .menu-control input[type="number"]:focus, .menu-control select:focus {
+            border-color: #90caf9;
         }
 
         /* Контейнеры экранов */
@@ -291,14 +335,24 @@
     <div id="menu-overlay" onclick="handleMenuOverlayClick(event)">
         <div class="menu-content">
             <button class="close-btn" onclick="toggleMenu()">×</button>
-            <button onclick="resetApp()">Сбросить прогресс</button>
-            <button id="pause-btn" onclick="togglePause()">Пауза</button>
-            <button onclick="updatePhotosCache(true)">Обновить базу фото</button>
-            <div>
-                <label for="font-size-input">Размер шрифта (px):</label>
+            
+            <button class="btn-danger" onclick="resetApp()">🔄 Сбросить прогресс</button>
+            <button class="btn-warning" id="pause-btn" onclick="togglePause()">⏸️ Пауза</button>
+            <button class="btn-info" onclick="updatePhotosCache(true)">⬇️ Обновить базу фото</button>
+            
+            <div class="menu-control">
+                <label for="db-size-select">📚 База логотипов:</label>
+                <select id="db-size-select" onchange="changeDbSize(this.value)">
+                    <option value="small" selected>Маленькая (~300)</option>
+                    <option value="large">Большая (~3400)</option>
+                </select>
+            </div>
+            
+            <div class="menu-control">
+                <label for="font-size-input">🔠 Размер шрифта (px):</label>
                 <input type="number" id="font-size-input" value="40" min="10" max="100" onchange="updateFontSize(this.value)">
             </div>
-            <button onclick="goToStart()">На главную</button>
+            <button class="btn-success" onclick="goToStart()">🏠 На главную</button>
         </div>
     </div>
 
@@ -1024,6 +1078,7 @@
         let timerInterval = null;
         let isPaused = false;
         let isAnswering = false; // Блокировка кнопок во время анимации
+        let selectedDbSize = 'small'; // Состояние выбранной базы логотипов
 
         // Инициализация при загрузке
         window.onload = async () => {
@@ -1032,7 +1087,8 @@
         };
 
         async function initPhotosData() {
-            const cachedData = localStorage.getItem('carPhotosData');
+            // Используем новый ключ, чтобы принудительно сбросить старый кэш с ошибками
+            const cachedData = localStorage.getItem('carPhotosData_v2'); 
             if (cachedData) {
                 try {
                     CAR_PHOTOS = JSON.parse(cachedData);
@@ -1047,18 +1103,42 @@
 
         async function updatePhotosCache(showAlert = false) {
             try {
-                // Добавляем параметр 'no-store' чтобы точно скачать свежий файл с сервера
-                const response = await fetch('photos_data.json', { cache: 'no-store' });
+                const response = await fetch('autowp_gallery.md', { cache: 'no-store' });
                 if (!response.ok) throw new Error('Файл не найден');
                 
-                CAR_PHOTOS = await response.json();
-                localStorage.setItem('carPhotosData', JSON.stringify(CAR_PHOTOS));
+                const text = await response.text();
+                CAR_PHOTOS = {};
+                
+                const lines = text.split('\n');
+                for (let line of lines) {
+                    line = line.trim();
+                    // Пропускаем шапку и разделители таблицы
+                    if (!line.startsWith('|') || line.startsWith('| Марка') || line.startsWith('|---')) continue;
+                    
+                    const parts = line.split('|').map(p => p.trim());
+                    if (parts.length >= 5) {
+                        // Очищаем бренд от счетчиков (например "Alfa Romeo 2282 +1" -> "Alfa Romeo")
+                        const brand = parts[1].replace(/\u00A0/g, ' ').replace(/\s+\d+(\s*\+\d+)?$/, '').trim();
+                        const isLogo = parts[2];
+                        const imageMarkdown = parts[4];
+                        
+                        // Берем только строки, где Лого == '0'
+                        if (isLogo === '0') {
+                            const urlMatch = imageMarkdown.match(/!\[.*?\]\((.*?)\)/);
+                            if (urlMatch && urlMatch[1]) {
+                                if (!CAR_PHOTOS[brand]) CAR_PHOTOS[brand] = [];
+                                CAR_PHOTOS[brand].push(urlMatch[1]);
+                            }
+                        }
+                    }
+                }
+                
+                localStorage.setItem('carPhotosData_v2', JSON.stringify(CAR_PHOTOS));
                 
                 if (showAlert) alert('База фотографий успешно скачана и сохранена на устройстве!');
-                console.log('Данные фото скачаны из файла и сохранены в кэш.');
             } catch (error) {
                 console.error("Ошибка обновления базы фото:", error);
-                if (showAlert) alert('Не удалось загрузить файл photos_data.json. Проверьте соединение.');
+                if (showAlert) alert('Не удалось загрузить файл autowp_gallery.md. Проверьте соединение.');
             }
         }
 
@@ -1079,6 +1159,13 @@
             document.documentElement.style.setProperty('--font-size', size + 'px');
         }
 
+        function changeDbSize(size) {
+            selectedDbSize = size;
+            if (size === 'large') {
+                alert('Выбрана большая база логотипов (~3400).\nЕсли у вас еще не подключен внешний файл с большой базой, могут отображаться стандартные вопросы.');
+            }
+        }
+
         function switchScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
@@ -1093,7 +1180,19 @@
 
         function startQuiz(mode) {
             currentMode = mode;
-            questionsList = [...CAR_DATA.emblems]; // В обоих режимах бренд берем из списка emblems
+            
+            if (mode === 'emblems') {
+                questionsList = [...CAR_DATA.emblems];
+            } else if (mode === 'internet') {
+                const brands = Object.keys(CAR_PHOTOS);
+                if (brands.length < 4) {
+                    alert('База фото не загружена или в ней недостаточно данных. Нажмите "Обновить базу фото" в меню!');
+                    return;
+                }
+                
+                questionsList = brands.map(brand => ({ answer: brand }));
+            }
+            
             // Перемешиваем вопросы
             questionsList.sort(() => Math.random() - 0.5); 
             
@@ -1158,11 +1257,29 @@
             
             img.onerror = () => {
                 if (!currentMode) return;
-                imageContainer.innerHTML = '<div class="loader" style="color: red;">Ошибка загрузки. Пропуск...</div>';
+                
+                // Если браузер не понимает .avif или сервер его скрыл, пробуем .jpg в качестве запасного варианта
+                if (img.src.includes('.avif') && !img.dataset.fallbackTried) {
+                    img.dataset.fallbackTried = "true";
+                    img.src = img.src.replace(/\.avif/i, '.jpg');
+                    return; // Прерываем обработку, ждем новый onload или onerror
+                }
+                
+                // Выводим подробный лог ошибки на экран
+                const errorLog = `<div style="color: red; font-size: 14px; text-align: left; padding: 15px; border: 2px solid red; background: #fff; border-radius: 8px; word-break: break-all;">
+                    <b>🚨 Ошибка загрузки фото:</b><br><br>
+                    <span style="color: #444;">URL:</span> <a href="${img.src}" target="_blank" style="color: blue;">${img.src}</a><br>
+                    <span style="color: #444;">Fallback (.jpg):</span> ${img.dataset.fallbackTried ? 'Был применен' : 'Нет'}<br><br>
+                    <i>Переход к следующему фото через 5 сек...</i>
+                </div>`;
+                
+                imageContainer.innerHTML = errorLog;
+                console.error("Ошибка загрузки изображения:", img.src);
+                
                 setTimeout(() => {
                     currentQuestionIndex++;
                     loadQuestion();
-                }, 1500);
+                }, 5000); // 5 секунд, чтобы успеть прочитать лог и кликнуть ссылку
             };
             
             if (currentMode === 'emblems') {
@@ -1182,42 +1299,16 @@
         }
 
         async function fetchCarImageFromWeb(brand) {
-            // Очищаем название от корпоративных суффиксов, чтобы поиск машины был точнее
-            const cleanBrand = brand.replace(/Motors?|Corporation|Group|Auto|Company|Inc\.?/ig, '').trim();
-            
-            // 1. ПРОВЕРКА ЛОКАЛЬНОЙ БАЗЫ: Если ссылка есть в нашей таблице, отдаем её моментально
             if (CAR_PHOTOS && CAR_PHOTOS[brand] && CAR_PHOTOS[brand].length > 0) {
-                const urls = CAR_PHOTOS[brand];
-                return urls[Math.floor(Math.random() * urls.length)]; // Берем случайное фото из заготовленных
-            }
-
-            // 2. РЕЗЕРВНЫЙ ПОИСК: Если в базе пусто, делаем быстрый запрос к API Википедии (origin=* обходит CORS)
-            const searchQuery = encodeURIComponent(`"${cleanBrand}" автомобиль`);
-            const apiUrl = `https://ru.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${searchQuery}&gsrlimit=5&prop=imageinfo&iiprop=url&iiurlwidth=500`;
-
-            try {
-                const response = await fetch(apiUrl);
-                const data = await response.json();
-                
-                if (data.query && data.query.pages) {
-                    const pages = Object.values(data.query.pages);
-                    for (const p of pages) {
-                        if (p.imageinfo && p.imageinfo[0] && p.imageinfo[0].thumburl) {
-                            const url = p.imageinfo[0].thumburl;
-                            // Отсеиваем логотипы (векторные изображения)
-                            if (!url.toLowerCase().endsWith('.svg')) {
-                                return url;
-                            }
-                        }
-                    }
+                // Дополнительная защита: берем только те строки, которые являются реальными ссылками
+                const validUrls = CAR_PHOTOS[brand].filter(url => url.startsWith('http'));
+                if (validUrls.length > 0) {
+                    return validUrls[Math.floor(Math.random() * validUrls.length)];
                 }
-                
-                // Надежная заглушка без интернета, если фото не найдено
-                return getFallbackImage(`Фото не найдено: ${cleanBrand}`);
-            } catch (error) {
-                console.error("Ошибка поиска фото:", error);
-                return getFallbackImage('Ошибка сети или поиск занял слишком много времени');
             }
+            
+            // Заглушка, если фото по какой-то причине не найдено
+            return getFallbackImage(`Фото не найдено: ${brand}`);
         }
 
         function handleAnswer(btnElement, selectedAnswer, correctAnswer) {
@@ -1281,7 +1372,7 @@
         function togglePause() {
             isPaused = !isPaused;
             const pauseBtn = document.getElementById('pause-btn');
-            pauseBtn.innerText = isPaused ? "Возобновить" : "Пауза";
+            pauseBtn.innerText = isPaused ? "▶️ Возобновить" : "⏸️ Пауза";
             
             if (isPaused) {
                 document.getElementById('question-image').style.opacity = '0.1'; // Скрываем вопрос на паузе
@@ -1297,7 +1388,7 @@
             isPaused = false;
             
             document.getElementById('timer').innerText = "00:00";
-            document.getElementById('pause-btn').innerText = "Пауза";
+            document.getElementById('pause-btn').innerText = "⏸️ Пауза";
             updateStatsUI();
             
             if (currentMode) {
