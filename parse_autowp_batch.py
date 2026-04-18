@@ -20,6 +20,20 @@ def get_last_processed_brand(filepath):
                     last_brand = parts[1]
     return last_brand
 
+def get_processed_brands(filepath):
+    """Считывает выходной файл и возвращает множество всех обработанных марок."""
+    processed = set()
+    if not os.path.exists(filepath):
+        return processed
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.startswith('|') and not line.startswith('| Марка') and not line.startswith('|---'):
+                parts = [p.strip() for p in line.split('|')]
+                if len(parts) > 2 and parts[1]:
+                    processed.add(parts[1])
+    return processed
+
 def parse_input_table(filepath):
     """Парсит исходный Markdown-файл и возвращает список словарей с задачами."""
     tasks = []
@@ -37,6 +51,49 @@ def parse_input_table(filepath):
                 })
     return tasks
 
+def scrape_tasks(tasks_list, page, out_file):
+    """Функция для обработки переданного списка задач."""
+    for task in tasks_list:
+        brand = task['brand']
+        url = task['url']
+        print(f"-> Обработка: {brand} ({url})", end="", flush=True)
+        
+        try:
+            page.goto(url, wait_until='domcontentloaded')
+            page.wait_for_timeout(1000)
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(2000)
+            
+            images = page.locator('img').all()
+            saved_count = 0
+            
+            for img in images:
+                img_url = img.get_attribute('src') or img.get_attribute('data-src')
+                
+                # Строгий фильтр: берем только фото с CDN wheelsage
+                if not img_url or 'wheelsage.org' not in img_url:
+                    continue
+                    
+                alt_text = img.get_attribute('alt') or img.get_attribute('title') or brand
+                img_url = urljoin(url, img_url)
+                
+                # ОПРЕДЕЛЯЕМ ЛОГОТИП
+                is_logo = 1 if '/brand/logo' in img_url.lower() else 0
+                
+                # Добавили колонку {is_logo} в запись
+                out_file.write(f"| {brand} | {is_logo} | {url} | ![{alt_text}]({img_url}) |\n")
+                saved_count += 1
+                
+            out_file.flush()
+            print(f" [+] Найдено: {saved_count}")
+            
+        except PlaywrightTimeoutError:
+            print(" [-] Таймаут загрузки, пропускаем...")
+            continue
+        except Exception as e:
+            print(f" [-] Ошибка: {e}")
+            continue
+
 def process_gallery():
     tasks = parse_input_table(INPUT_FILE)
     if not tasks:
@@ -53,12 +110,6 @@ def process_gallery():
                 break
     
     tasks_to_process = tasks[start_index:]
-    
-    if not tasks_to_process:
-        print("[*] Все ссылки из файла уже обработаны.")
-        return
-        
-    print(f"[*] Осталось обработать марок: {len(tasks_to_process)} из {len(tasks)}")
 
     is_new_file = not os.path.exists(OUTPUT_FILE) or os.path.getsize(OUTPUT_FILE) == 0
     
@@ -70,61 +121,42 @@ def process_gallery():
         # Глобальный таймаут 30 секунд
         page.set_default_timeout(30000)
 
-        with open(OUTPUT_FILE, 'a', encoding='utf-8') as out_file:
-            if is_new_file:
-                # Обновили шапку под новую колонку
-                out_file.write("| Марка автомобиля | Лого | Источник | Изображение |\n")
-                out_file.write("|---|---|---|---|\n")
+        # --- Основной проход ---
+        if tasks_to_process:
+            print(f"[*] Осталось обработать марок (основной проход): {len(tasks_to_process)} из {len(tasks)}")
+            with open(OUTPUT_FILE, 'a', encoding='utf-8') as out_file:
+                if is_new_file:
+                    out_file.write("| Марка автомобиля | Лого | Источник | Изображение |\n")
+                    out_file.write("|---|---|---|---|\n")
 
-            try:
-                for task in tasks_to_process:
-                    brand = task['brand']
-                    url = task['url']
-                    print(f"-> Обработка: {brand} ({url})", end="", flush=True)
-                    
-                    try:
-                        page.goto(url, wait_until='domcontentloaded')
-                        page.wait_for_timeout(1000)
-                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        page.wait_for_timeout(2000)
-                        
-                        images = page.locator('img').all()
-                        saved_count = 0
-                        
-                        for img in images:
-                            img_url = img.get_attribute('src') or img.get_attribute('data-src')
-                            
-                            # Строгий фильтр: берем только фото с CDN wheelsage
-                            if not img_url or 'wheelsage.org' not in img_url:
-                                continue
-                                
-                            alt_text = img.get_attribute('alt') or img.get_attribute('title') or brand
-                            img_url = urljoin(url, img_url)
-                            
-                            # ОПРЕДЕЛЯЕМ ЛОГОТИП
-                            is_logo = 1 if '/brand/logo' in img_url.lower() else 0
-                            
-                            # Добавили колонку {is_logo} в запись
-                            out_file.write(f"| {brand} | {is_logo} | {url} | ![{alt_text}]({img_url}) |\n")
-                            saved_count += 1
-                            
-                        out_file.flush()
-                        print(f" [+] Найдено: {saved_count}")
-                        
-                    except PlaywrightTimeoutError:
-                        print(" [-] Таймаут загрузки, пропускаем...")
-                        continue
-                    except Exception as e:
-                        print(f" [-] Ошибка: {e}")
-                        continue
-            
-            except KeyboardInterrupt:
-                print("\n\n[!] Парсинг прерван пользователем. Прогресс сохранен.")
-                
+                try:
+                    scrape_tasks(tasks_to_process, page, out_file)
+                except KeyboardInterrupt:
+                    print("\n\n[!] Парсинг прерван пользователем. Прогресс сохранен.")
+                    browser.close()
+                    return
+
+        # --- Сверка и повторный проход ---
+        print("\n[*] Сверка списков и поиск пропущенных марок...")
+        processed_brands = get_processed_brands(OUTPUT_FILE)
+        missing_tasks = [t for t in tasks if t['brand'] not in processed_brands]
+
+        if missing_tasks:
+            print(f"[*] Найдено пропущенных марок: {len(missing_tasks)}. Начинаем повторную обработку...")
+            with open(OUTPUT_FILE, 'a', encoding='utf-8') as out_file:
+                if not os.path.exists(OUTPUT_FILE) or os.path.getsize(OUTPUT_FILE) == 0:
+                    out_file.write("| Марка автомобиля | Лого | Источник | Изображение |\n")
+                    out_file.write("|---|---|---|---|\n")
+                try:
+                    scrape_tasks(missing_tasks, page, out_file)
+                except KeyboardInterrupt:
+                    print("\n\n[!] Повторный парсинг прерван пользователем.")
+        else:
+            print("[*] Все марки успешно обработаны, пропущенных нет.")
+
         browser.close()
     
-    if len(tasks_to_process) > 0:
-        print("Работа завершена.")
+    print("Работа завершена.")
 
 if __name__ == '__main__':
     process_gallery()
